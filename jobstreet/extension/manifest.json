@@ -1,0 +1,86 @@
+{
+  "manifest_version": 3,
+  "name": "JobStreet Job Application Assistant",
+  "version": "1.5.2",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy1h/hbrW2TsRV+Xx8b8xPEedb/ViDivRYN4EdUQ76AoT7vkNPyrb+PtkYq/MXa4eTTBjemXS4cGG4WTEWbVp3N9rnN7cfIMFebgSuDRTjfH2BUKULGweVlgU/ASvy5p5kag0nkglpnWn/oUcGkwCUvBz25ADiu61KC0gq0f5exbf5r9bR5FO12LNe/tuhKofaZ5r1o2QBGHD9oes5x6ryxwHcTWW/HbLoGhf+7ItAaQG8OtZh/4ELi9j9cGN4GGdtikFtetJYvyeGfNEyGKZKUbHXF0t/tUTjo5KuQTUldsb9uSR6mG2HmzpbGF7SUKAtFpL4vQ+HNWRV3rjVu/DPQIDAQAB",
+  "description": "Capture the current visible JobStreet listing locally and match it against the shared job tracker.",
+  "permissions": [
+    "activeTab",
+    "nativeMessaging",
+    "sidePanel",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://jobstreet.com/*",
+    "https://*.jobstreet.com/*",
+    "https://jobstreet.com.sg/*",
+    "https://*.jobstreet.com.sg/*",
+    "http://127.0.0.1:8767/*",
+    "https://*.successfactors.com/*",
+    "https://*.successfactors.eu/*",
+    "https://*.sapsf.com/*",
+    "https://*.sapsf.eu/*",
+    "https://*.sapsf.cn/*",
+    "https://*.hr.cloud.sap/*",
+    "https://*.jobs.hr.cloud.sap.com/*",
+    "https://*.myworkdayjobs.com/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "Open JobStreet Job Application Assistant"
+  },
+  "commands": {
+    "capture-current-job": {
+      "suggested_key": {
+        "windows": "Ctrl+Q"
+      },
+      "description": "Capture the current visible JobStreet job"
+    },
+    "open-local-dashboard": {
+      "suggested_key": {
+        "windows": "Ctrl+M"
+      },
+      "description": "Open the shared job dashboard"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://jobstreet.com/*",
+        "https://*.jobstreet.com/*",
+        "https://jobstreet.com.sg/*",
+        "https://*.jobstreet.com.sg/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.successfactors.com/*",
+        "https://*.successfactors.eu/*",
+        "https://*.sapsf.com/*",
+        "https://*.sapsf.eu/*",
+        "https://*.sapsf.cn/*",
+        "https://*.hr.cloud.sap/*",
+        "https://*.jobs.hr.cloud.sap.com/*",
+        "https://*.myworkdayjobs.com/*"
+      ],
+      "js": [
+        "successfactors-core.js",
+        "successfactors-autofill.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "autofill-profile.html"
+}

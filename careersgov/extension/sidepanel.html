@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Careers@Gov Job Assistant</title><link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <p><a href="autofill-profile.html" target="_blank" rel="noopener">Workday / SuccessFactors autofill defaults</a></p>
+<header><span class="eyebrow">LOCAL JOB WORKSPACE</span><h1>Careers@Gov Job Assistant</h1>
+<p>Capture the visible listing, compare it with your resume, and track your application.</p></header>
+<main>
+  <section class="connection card"><span id="connection-dot" class="dot"></span><div><strong id="connection-text">Checking local companion…</strong><small>Jobs, Excel, resumes, and answers stay on this computer.</small></div></section>
+  <form id="job-form" class="card">
+    <div class="section-title"><h2>Current visible listing</h2><label class="toggle"><input id="auto-capture" type="checkbox"> Auto-capture</label></div>
+    <button id="refresh-fields" class="outline refresh" type="button">Refresh fields from this page</button>
+    <label>Job title<input id="job-title" name="title" required maxlength="500"></label>
+    <label>Agency / company<input id="job-company" name="company" required maxlength="500"></label>
+    <label>Careers@Gov URL<input id="job-url" name="url" required type="url"></label>
+    <div class="two-columns">
+      <label>Location<input id="job-location" name="location" maxlength="200"></label>
+      <label>Salary<input id="job-salary" name="salary" maxlength="200"></label>
+      <label>Work arrangement<input id="job-workplace" name="workplace_type" maxlength="200"></label>
+      <label>Employment type<input id="job-employment" name="employment_type" maxlength="200"></label>
+      <label>Posting date<input id="job-posted" name="posting_date" maxlength="200"></label>
+      <label>Closing date<input id="job-closing" name="closing_date" maxlength="200"></label>
+    </div>
+    <label>Application link<input id="job-application" name="application_url" type="url"></label>
+    <label>Job description<textarea id="job-description" name="job_description" rows="8" required maxlength="500000"></textarea></label>
+    <button id="save-job" class="primary" type="submit">Save and match this job · Ctrl+Q</button>
+    <p id="capture-status" class="status" role="status" aria-live="polite"></p>
+  </form>
+  <section class="card analysis-card">
+    <div class="section-title"><h2>Saved job analysis</h2><button id="rematch" class="text-button" type="button">Match all again</button></div>
+    <p id="analysis-summary">Capture a job to view its resume match.</p>
+    <div id="skills" class="skills" hidden></div>
+    <a id="resume-link" hidden target="_blank" rel="noreferrer">Open tailored PDF resume</a>
+  </section>
+  <section class="actions">
+    <button id="dashboard" class="outline" type="button">Open local dashboard · Ctrl+M</button>
+    <button id="profile" class="outline" type="button">Application autofill defaults</button>
+    <button id="open-jobs" class="outline" type="button">Open Careers@Gov</button>
+  </section>
+  <section class="card shortcuts"><h2>Batch capture shortcuts</h2><p>Ctrl+[ · Open job links on this page</p><p>Ctrl+] · Capture and close those tabs</p></section>
+</main>
+<footer>Review Workday autofill answers. Sign-in, declarations, Save and Continue, and final submission remain manual.</footer>
+<script src="sidepanel.js"></script>
+</body></html>

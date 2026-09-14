@@ -1,0 +1,54 @@
+"use strict";
+const test = require('node:test'), assert = require('node:assert/strict');
+const fs = require('node:fs'), path = require('node:path');
+const core = require('./extension/successfactors-core.js');
+test('generic field mapping uses the supplied resume profile only', () => {
+  const data = {profile:{prefix:'Mr.',first_name:'Alex',phone_device_type:'Mobile',street_name:'1 Example Street',additional_address:'Unit 2',linkedin_url:'https://linkedin.com/in/example',website_url:'https://one.example',website_url_2:'https://two.example',gender:'Example gender',date_of_birth:'1990-02-03',country_of_birth:'Example birth country',ethnicity:'Example ethnicity',religion:'Example religion',nationality:'Example nationality',additional_nationalities:'Second nationality',expected_salary:'4200',notice_period:'One month',work_authorized:'Yes',requires_sponsorship:'No',willing_to_travel:'Yes',future_recruitment_consent:'No',criminal_record:'No',employment:[{employer:'Example Ltd',current:true,job_title:'Analyst',start_date:'2020-03'}]},custom_answers:[]};
+  assert.equal(core.answer('Given Name', '', 0, data), 'Alex');
+  assert.equal(core.answer('Current employer name', 'employment', 0, data), 'Example Ltd');
+  assert.equal(core.answer('Start year', 'employment', 0, data), '2020');
+  assert.equal(core.answer('Expected annual salary', '', 0, data), null);
+  assert.equal(core.answer('Prefix', '', 0, data), 'Mr.');
+  assert.equal(core.answer('Phone Device Type', '', 0, data), 'Mobile');
+  assert.equal(core.answer('Street Name', '', 0, data), '1 Example Street');
+  assert.equal(core.answer('Additional Address', '', 0, data), 'Unit 2');
+  assert.equal(core.answer('LinkedIn Website', '', 0, data), 'https://linkedin.com/in/example');
+  assert.equal(core.answer('Website 2', '', 0, data), 'https://two.example');
+  assert.equal(core.answer('Gender', '', 0, data), 'Example gender');
+  assert.equal(core.answer('Date of Birth', '', 0, data), '1990-02-03');
+  assert.equal(core.answer('Country / Territory of Birth', '', 0, data), 'Example birth country');
+  assert.equal(core.answer('Race/Ethnicity', '', 0, data), 'Example ethnicity');
+  assert.equal(core.answer('Religion', '', 0, data), 'Example religion');
+  assert.equal(core.answer('Primary Nationality', '', 0, data), 'Example nationality');
+  assert.equal(core.answer('Additional Nationalities', '', 0, data), 'Second nationality');
+  assert.equal(core.answer('Are you legally authorised to work in this country?', '', 0, data), 'Yes');
+  assert.equal(core.answer('Will you need sponsorship for your work authorisation?', '', 0, data), 'No');
+  assert.equal(core.answer('How much notice must you provide your current employer before leaving?', '', 0, data), 'One month');
+  assert.equal(core.answer('I agree to have my personal data processed for other positions', '', 0, data), 'No');
+  assert.equal(core.answer('Have you ever been convicted of an offence?', '', 0, data), 'No');
+  assert.equal(core.answer('Current salary', 'employment', 0, data), undefined);
+  assert.equal(core.answer('Do you agree to the declaration?', '', 0, data), null);
+  assert.equal(core.answer('First name', '', 0, {profile:{}}), undefined);
+  assert.equal(core.answer('Country of birth', '', 0, {profile:{country:'Example'}}), undefined);
+  assert.equal(core.answer('Referee first name', '', 0, data), null);
+});
+test('only supported SAP hosts and exact dropdown answers match', () => {
+  assert.ok(core.supported('career.successfactors.eu'));
+  assert.ok(core.supported('example.jobs.hr.cloud.sap'));
+  assert.ok(core.supported('example.myworkdayjobs.com'));
+  assert.ok(!core.supported('successfactors.com.evil.invalid'));
+  assert.ok(core.optionMatch('Citizen (Singapore)', 'Singapore Citizen'));
+  assert.ok(!core.optionMatch('Not Applicable (Singapore)', 'Singapore Citizen'));
+});
+test('three extension packages contain identical shared assets and wiring', () => {
+  for (const project of ['linkedin','jobstreet','careersgov']) {
+    const folder = path.join(__dirname,'..',project,'extension');
+    const manifest = JSON.parse(fs.readFileSync(path.join(folder,'manifest.json')));
+    assert.ok(manifest.content_scripts.some(item => item.js.includes('successfactors-autofill.js')));
+    assert.ok(!manifest.host_permissions.includes('<all_urls>'));
+    assert.match(fs.readFileSync(path.join(folder,'service-worker.js'),'utf8'), /importScripts\("successfactors-worker.js"\)/);
+    for (const file of fs.readdirSync(path.join(__dirname,'extension'))) {
+      assert.equal(fs.readFileSync(path.join(folder,file),'utf8'), fs.readFileSync(path.join(__dirname,'extension',file),'utf8'));
+    }
+  }
+});

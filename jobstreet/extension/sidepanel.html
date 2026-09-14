@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobStreet Job Assistant</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <p><a href="autofill-profile.html" target="_blank" rel="noopener">Workday / SuccessFactors autofill defaults</a></p>
+  <header>
+    <span class="eyebrow">LOCAL JOB WORKSPACE</span>
+    <h1>JobStreet Job Assistant</h1>
+    <p>Capture the current listing, compare it with your resume, and track it alongside LinkedIn jobs.</p>
+  </header>
+  <main>
+    <section class="connection card">
+      <span id="connection-dot" class="dot"></span>
+      <div>
+        <strong id="connection-text">Checking local companion...</strong>
+        <small id="database-text">SQLite, Excel, resumes, and generated files stay on this computer.</small>
+      </div>
+    </section>
+
+    <form id="job-form" class="card">
+      <div class="section-title">
+        <h2>Current visible listing</h2>
+        <label class="toggle"><input id="auto-capture" type="checkbox"> Auto-capture</label>
+      </div>
+      <button id="refresh-fields" class="outline refresh" type="button">Refresh fields from this page</button>
+      <label>Job title<input id="job-title" name="title" required maxlength="200" autocomplete="off"></label>
+      <label>Company<input id="job-company" name="company" required maxlength="200" autocomplete="organization"></label>
+      <label>JobStreet URL<input id="job-url" name="url" required type="url" placeholder="https://sg.jobstreet.com/job/12345678"></label>
+      <div class="two-columns">
+        <label>Location<input id="job-location" name="location" maxlength="200"></label>
+        <label>Salary<input id="job-salary" name="salary" maxlength="200"></label>
+        <label>Work arrangement<input id="job-workplace" name="workplace_type" maxlength="100" placeholder="Hybrid"></label>
+        <label>Employment type<input id="job-employment" name="employment_type" maxlength="100" placeholder="Full-time"></label>
+      </div>
+      <label>Posting date<input id="job-posted" name="posting_date" maxlength="100" placeholder="31 Aug 2026"></label>
+      <label>Job description<textarea id="job-description" name="job_description" required maxlength="250000" rows="10" placeholder="The current JobStreet description appears here automatically; manual entry remains available."></textarea></label>
+      <button id="save-job" class="primary" type="submit">Save and match this job</button>
+      <p id="capture-status" class="status" role="status"></p>
+    </form>
+
+    <section class="card analysis-card">
+      <div class="section-title">
+        <h2>Resume match</h2>
+        <button id="rematch" class="text-button" type="button">Match all again</button>
+      </div>
+      <p id="analysis-summary">Save a job to compare it with your newest resume.</p>
+      <div id="skills" class="skills" hidden></div>
+      <a id="resume-link" hidden target="_blank" rel="noreferrer">Open tailored PDF resume</a>
+      <button id="letter" class="secondary" type="button" disabled>Generate cover-letter draft</button>
+      <div id="letter-output" class="draft-output" hidden></div>
+    </section>
+
+    <section class="card related-card">
+      <h2>LinkedIn database matches</h2>
+      <p id="related-summary">Save a job to check for the same company and role in the shared LinkedIn tracker.</p>
+      <div id="related-jobs" class="related-jobs" hidden></div>
+    </section>
+
+    <section class="actions">
+      <button id="dashboard" class="outline" type="button">Open unified dashboard</button>
+      <p id="action-status" class="status" role="status"></p>
+    </section>
+  </main>
+  <footer>Only the current visible job-detail page is captured. Credentials, verification data, application forms, and final submissions remain manual.</footer>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

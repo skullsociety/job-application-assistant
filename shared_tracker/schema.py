@@ -1,0 +1,53 @@
+"""Additive fields and one canonical job-description representation."""
+from __future__ import annotations
+
+import sqlite3
+import re
+from pathlib import Path
+from urllib.parse import urlsplit
+
+WORKSPACE = Path(__file__).resolve().parent.parent
+LOCAL_DATA = WORKSPACE / "local-data"
+DATABASE_PATH = LOCAL_DATA / "jobs.sqlite3"
+EXPORT_PATH = LOCAL_DATA / "exports" / "job_tracker.xlsx"
+EXTRA_COLUMNS = {
+    "closing_date": "TEXT", "key_skills": "TEXT", "resume_name": "TEXT",
+    "source_job_id": "TEXT", "legacy_careersgov_id": "INTEGER",
+    # Compatibility aliases retained for existing Careers@Gov clients.
+    "description": "TEXT", "captured_at": "TEXT",
+    "submission_approved_at": "TEXT",
+}
+
+
+def add_shared_columns(connection: sqlite3.Connection) -> None:
+    existing = {row[1] for row in connection.execute("PRAGMA table_info(jobs)")}
+    for name, definition in EXTRA_COLUMNS.items():
+        if name not in existing:
+            connection.execute(f"ALTER TABLE jobs ADD COLUMN {name} {definition}")
+
+
+def normalize_shared_rows(connection: sqlite3.Connection) -> None:
+    """Only fill absent aliases. Never invent salaries, locations or skills."""
+    connection.execute("""UPDATE jobs SET
+        description=COALESCE(description, job_description),
+        job_description=COALESCE(job_description, description),
+        captured_at=COALESCE(captured_at, first_seen_at, created_at),
+        platform=CASE source WHEN 'careersgov' THEN 'Careers@Gov'
+            WHEN 'jobstreet' THEN 'JobStreet' WHEN 'linkedin' THEN 'LinkedIn' ELSE platform END
+        WHERE description IS NULL OR job_description IS NULL OR captured_at IS NULL
+            OR platform IS NULL OR platform=''""")
+    # Followed Up is now derived from the scheduled date, not an independent UI choice.
+    connection.execute("""UPDATE jobs SET followed_up=CASE WHEN NULLIF(TRIM(follow_up_date), '') IS NOT NULL THEN 1 ELSE 0 END,
+        followed_up_at=CASE WHEN NULLIF(TRIM(follow_up_date), '') IS NULL THEN NULL ELSE followed_up_at END
+        WHERE followed_up <> CASE WHEN NULLIF(TRIM(follow_up_date), '') IS NOT NULL THEN 1 ELSE 0 END""")
+    for row in connection.execute("SELECT id, url, notes, source_job_id, key_skills FROM jobs WHERE source_job_id IS NULL OR key_skills IS NULL").fetchall():
+        identifier, url, notes, source_id, skills = row
+        if source_id is None:
+            parsed = urlsplit(url)
+            if parsed.hostname in {'www.linkedin.com', 'linkedin.com', 'jobs.careers.gov.sg'} or re.fullmatch(r'(?:[a-z0-9-]+\.)*jobstreet\.com(?:\.[a-z]{2})?', parsed.hostname or ''):
+                source_id = parsed.path.rstrip('/').rsplit('/', 1)[-1]
+        if skills is None and (notes or '').startswith('Skills mentioned: '):
+            original_skills = notes.split('\n', 1)[0].removeprefix('Skills mentioned: ').strip()
+            if not original_skills.startswith('None recognized'):
+                skills = original_skills
+        connection.execute('UPDATE jobs SET source_job_id=?, key_skills=? WHERE id=?', (source_id, skills, identifier))

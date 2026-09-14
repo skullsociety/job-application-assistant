@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="jobs-revision" content="{{REVISION}}">
+  <title>Unified Job Application Dashboard</title>
+  <link rel="stylesheet" href="/dashboard.css">
+</head>
+<body>
+  <header><h1>Unified Job Application Dashboard</h1>
+    <p>{{COUNT}} jobs across LinkedIn, JobStreet and Careers@Gov · {{APPLIED}} marked applied · {{FOLLOWED}} followed up · Updates appear automatically</p></header>
+  <main>
+    <div class="toolbar"><button id="rematch">Match newest resume again</button><a href="/exports/job_tracker.xlsx">Download Excel tracker</a><span id="dashboard-status" role="status" aria-live="polite"></span></div>
+    <div class="card"><table><thead><tr>{{HEADERS}}<th>Actions</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
+  </main>
+  <script src="/dashboard.js"></script>
+</body>
+</html>

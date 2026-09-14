@@ -1,0 +1,20 @@
+# Local, non-secret preferences. The setup command copies this to config.toml.
+# When the sibling LinkedIn project and its database exist, JobStreet uses that
+# same SQLite database, Excel export, resume folder, and tailored-resume folder.
+share_linkedin_tracker = true
+linkedin_project_dir = "../linkedin"
+
+# Set share_linkedin_tracker = false for a separate JobStreet-only tracker.
+data_dir = "data"
+log_path = "logs/jobstreet_job_assistant.log"
+browser_user_data_dir = "data/browser-profile"
+browser = "chrome"
+profile_path = "data/profile.json"
+tailored_resume_threshold = 70
+
+# Optional explicit overrides. Uncomment only when needed.
+# database_path = "data/jobs.sqlite3"
+# export_path = "exports/job_tracker.xlsx"
+# tailored_resume_dir = "exports/tailored_resumes"
+# resume_dir = "resumes"
+# resume_path = ""

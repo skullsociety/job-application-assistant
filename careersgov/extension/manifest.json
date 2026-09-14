@@ -1,0 +1,83 @@
+{
+  "manifest_version": 3,
+  "name": "Careers@Gov Assistant",
+  "version": "0.12.1",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtOMxrzt8zPvu1zIuEnb8Eoqha3DVOV07jpnt1brrU8HNzHJIbl62aomXQv5JX576hTW4w3BbG/wcSiSKZXaxTNuSjpYLo3PexzNyx1htw0dtbL4rPIkjCf7rlDcCOKs+PcqTnfUf2K+9yodWY3NAEKvPWjzHqEs5D3g5v1Xiybw34Y2UuV6nThscmIoNp4IQHAN1ePpNIPINxaEc28ZqzIaXspmC6uHhan+N/b+YA7QxAgU/yCAu/H6LMsYxjAQh9IR2XFvwgSuBOnJSfYoo0B4hLQAad0oeiJhCME0QAdOyE4dChLHVC6Mio8n5DNDUY8YFiS+OWTNyT+Ev3PnZfwIDAQAB",
+  "description": "Capture Careers@Gov jobs and locally autofill known Workday application fields for review.",
+  "permissions": [
+    "activeTab",
+    "sidePanel",
+    "scripting",
+    "storage",
+    "tabs",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "https://jobs.careers.gov.sg/*",
+    "https://sggovterp.wd102.myworkdayjobs.com/*",
+    "http://127.0.0.1:8765/*",
+    "http://127.0.0.1:8767/*",
+    "https://*.successfactors.com/*",
+    "https://*.successfactors.eu/*",
+    "https://*.sapsf.com/*",
+    "https://*.sapsf.eu/*",
+    "https://*.sapsf.cn/*",
+    "https://*.hr.cloud.sap/*",
+    "https://*.jobs.hr.cloud.sap.com/*",
+    "https://*.myworkdayjobs.com/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "Open Careers@Gov Assistant"
+  },
+  "options_page": "autofill-profile.html",
+  "commands": {
+    "capture-current-job": {
+      "suggested_key": {
+        "windows": "Ctrl+Q"
+      },
+      "description": "Capture the current Careers@Gov job"
+    },
+    "open-local-dashboard": {
+      "suggested_key": {
+        "windows": "Ctrl+M"
+      },
+      "description": "Open the shared job dashboard"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://jobs.careers.gov.sg/*"
+      ],
+      "js": [
+        "capture-core.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.successfactors.com/*",
+        "https://*.successfactors.eu/*",
+        "https://*.sapsf.com/*",
+        "https://*.sapsf.eu/*",
+        "https://*.sapsf.cn/*",
+        "https://*.hr.cloud.sap/*",
+        "https://*.jobs.hr.cloud.sap.com/*",
+        "https://*.myworkdayjobs.com/*"
+      ],
+      "js": [
+        "successfactors-core.js",
+        "successfactors-autofill.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ]
+}
