@@ -2,20 +2,27 @@
 importScripts('successfactors-core.js');
 (() => {
   const PROFILE_URL = 'http://127.0.0.1:8767/api/autofill-profile';
-  function editor(sender) { return sender.url?.split('?')[0] === chrome.runtime.getURL('autofill-profile.html'); }
-  async function request(options = {}) {
+  function timeout(promise, milliseconds, message) {
+    return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(message)), milliseconds))]);
+  }
+  async function fetchProfile(options) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
     try {
-      const response = await fetch(PROFILE_URL, {cache: 'no-store', ...options});
+      const response = await fetch(PROFILE_URL, {cache: 'no-store', signal: controller.signal, ...options});
       const value = await response.json();
       if (!response.ok || !value.ok) throw new Error(value.error || 'The autofill profile could not be loaded.');
       return value;
-    } catch (error) {
-      if (!(error instanceof TypeError)) throw error;
-      await globalThis.JobAssistantLifecycle.start();
-      const response = await fetch(PROFILE_URL, {cache: 'no-store', ...options});
-      const value = await response.json();
-      if (!response.ok || !value.ok) throw new Error(value.error || 'Profile unavailable.');
-      return value;
+    } finally { clearTimeout(timer); }
+  }
+  function editor(sender) { return sender.url?.split('?')[0] === chrome.runtime.getURL('autofill-profile.html'); }
+  async function request(options = {}) {
+    try {
+      return await fetchProfile(options);
+    } catch {
+      if (!globalThis.JobAssistantLifecycle?.start) throw new Error('Reload this extension after running the suite setup.');
+      await timeout(globalThis.JobAssistantLifecycle.start(), 12000, 'The Chrome helper did not start within 12 seconds. Run the suite setup and reload this extension.');
+      return fetchProfile(options);
     }
   }
   chrome.runtime.onMessage.addListener((message, sender, respond) => {

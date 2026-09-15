@@ -98,6 +98,16 @@ test('profile editor saves unchanged history as dynamic defaults, not frozen ove
     await page.waitForFunction(()=>saved.overrides.first_name==='Alex');
   } finally {await browser.close();}
 });
+test('profile editor shows manual fields immediately while the local assistant is still connecting', async () => {
+  const {browser,page} = await browserPage(fs.readFileSync(asset('autofill-profile.html'),'utf8').replace('<script src="autofill-profile.js"></script>',''),'https://local.invalid/profile');
+  try {
+    await page.evaluate(()=>{chrome.runtime.sendMessage=()=>new Promise(()=>{});});
+    await page.addScriptTag({path:asset('autofill-profile.js')});
+    await page.waitForSelector('#contact-fields [data-key="first_name"]');
+    assert.equal(await page.locator('#source').textContent(),'No source resume found.');
+    assert.equal(await page.locator('#status').textContent(),'Connecting to the local assistant…');
+  } finally {await browser.close();}
+});
 test('dashboard refresh adds rows outside editors, defers inside editors, and preserves unsaved notes', async () => {
   const row = (id,title) => `<tr data-job-row data-id="${id}"><td data-sort="${id}">${title}<details><summary>Details</summary><textarea class="tracking-notes" data-id="${id}"></textarea></details><input class="follow-up-date" data-id="${id}" data-saved-value="" type="date" min="2000-01-01"><button>Review</button></td></tr>`;
   const html = (revision,rows) => `<meta name="jobs-revision" content="${revision}"><header><p>Jobs</p></header><button id="rematch">Rematch</button><p id="dashboard-status"></p><table><tbody>${rows}</tbody></table>`;

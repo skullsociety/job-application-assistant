@@ -46,7 +46,7 @@ Capture jobs with each site’s extension. All captures appear on the shared das
 
 Only the follow-up date is displayed. Entering a date stores **Followed Up = Yes**; clearing it stores **No**. The derived field remains in the database and Excel export.
 
-Put a new text-readable PDF or DOCX resume in `local-data/resumes/`. The newest resume supplies local defaults for contact information, skills, education and employment. Open **Workday / SuccessFactors autofill defaults** from any extension to review or override extracted values. Saved overrides are private and shared by all three extensions.
+Put a new text-readable PDF or DOCX resume in `local-data/resumes/`. The newest resume supplies skills, education and employment only. Open **Workday / SuccessFactors autofill defaults** from any extension, enter contact and application details manually, and review the extracted resume history. Saved values remain private and are shared by all three extensions on this computer.
 
 The autofill preserves existing answers and never submits an application. Passwords, verification, declarations, file uploads, Save/Continue and final submission stay manual. Review every generated answer before using it.
 

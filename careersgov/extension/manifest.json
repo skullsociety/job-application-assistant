@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Careers@Gov Assistant",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtOMxrzt8zPvu1zIuEnb8Eoqha3DVOV07jpnt1brrU8HNzHJIbl62aomXQv5JX576hTW4w3BbG/wcSiSKZXaxTNuSjpYLo3PexzNyx1htw0dtbL4rPIkjCf7rlDcCOKs+PcqTnfUf2K+9yodWY3NAEKvPWjzHqEs5D3g5v1Xiybw34Y2UuV6nThscmIoNp4IQHAN1ePpNIPINxaEc28ZqzIaXspmC6uHhan+N/b+YA7QxAgU/yCAu/H6LMsYxjAQh9IR2XFvwgSuBOnJSfYoo0B4hLQAad0oeiJhCME0QAdOyE4dChLHVC6Mio8n5DNDUY8YFiS+OWTNyT+Ev3PnZfwIDAQAB",
   "description": "Capture Careers@Gov jobs and locally autofill known Workday application fields for review.",
   "permissions": [

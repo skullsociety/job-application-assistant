@@ -11,6 +11,7 @@ from .schema import LOCAL_DATA, WORKSPACE
 from .resume_profile import newest_resume, read_resume, parse_resume
 
 PROFILE_PATH = LOCAL_DATA / 'private/autofill-profile.local.json'
+RESUME_DEFAULT_FIELDS = frozenset({'skills', 'education', 'employment'})
 TEXT_FIELDS = ('prefix','full_name','first_name','last_name','email','phone','phone_device_type','country','city',
                'street_name','additional_address','address_line1','postal_code','linkedin_url','website_url','website_url_2',
                'expected_salary','salary_currency','notice_period','gender','date_of_birth','country_of_birth','ethnicity',
@@ -86,7 +87,8 @@ def get_profile(path: Path = PROFILE_PATH, folders: list[Path] | None = None) ->
                     _cache[signature] = parse_resume(text)
                 except Exception as exc:
                     _cache[signature] = ({}, ['The newest resume could not be parsed: ' + str(exc)])
-            defaults, warnings = _cache[signature]
+            extracted, warnings = _cache[signature]
+            defaults = {key: value for key, value in extracted.items() if key in RESUME_DEFAULT_FIELDS}
             source = {'name': resume.name, 'modified_ns': signature[1]}
         else: warnings = ['Add a source PDF or DOCX resume to local-data/resumes.']
         effective = {**{key: '' for key in TEXT_FIELDS}, 'education': [], 'employment': [], **defaults, **saved['overrides']}

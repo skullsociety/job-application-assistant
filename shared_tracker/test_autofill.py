@@ -63,8 +63,12 @@ class AutofillTests(unittest.TestCase):
             os.utime(second, ns=(first.stat().st_mtime_ns + 1000000, first.stat().st_mtime_ns + 1000000))
             with patch('shared_tracker.autofill_profile.read_resume', return_value=SAMPLE.replace('Alex Example','Taylor Sample').replace('Python, SQL','Rust, SQL')):
                 after = get_profile(saved, [root])
-            self.assertEqual(after['profile']['full_name'], 'Taylor Sample')
+            self.assertEqual(after['profile']['full_name'], '')
+            self.assertEqual(after['profile']['email'], '')
+            self.assertEqual(after['profile']['street_name'], '')
             self.assertIn('Rust', after['profile']['skills'])
+            self.assertEqual(after['profile']['education'][0]['institution'], 'Example University')
+            self.assertEqual(after['profile']['employment'][0]['employer'], 'Example Company')
             self.assertEqual(after['profile']['notice_period'], 'Two weeks')
             self.assertNotEqual(before['revision'], after['revision'])
             self.assertEqual(after['source']['name'], 'second.docx')

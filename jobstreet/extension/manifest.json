@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JobStreet Job Application Assistant",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy1h/hbrW2TsRV+Xx8b8xPEedb/ViDivRYN4EdUQ76AoT7vkNPyrb+PtkYq/MXa4eTTBjemXS4cGG4WTEWbVp3N9rnN7cfIMFebgSuDRTjfH2BUKULGweVlgU/ASvy5p5kag0nkglpnWn/oUcGkwCUvBz25ADiu61KC0gq0f5exbf5r9bR5FO12LNe/tuhKofaZ5r1o2QBGHD9oes5x6ryxwHcTWW/HbLoGhf+7ItAaQG8OtZh/4ELi9j9cGN4GGdtikFtetJYvyeGfNEyGKZKUbHXF0t/tUTjo5KuQTUldsb9uSR6mG2HmzpbGF7SUKAtFpL4vQ+HNWRV3rjVu/DPQIDAQAB",
   "description": "Capture the current visible JobStreet listing locally and match it against the shared job tracker.",
   "permissions": [
