@@ -137,6 +137,7 @@ function renderRelated(relatedJobs = []) {
 }
 
 function renderAnalysis(job) {
+  CoverLetterPanel.setJob(job.id);
   state.saved = job;
   const pending = job.match_score === null || job.match_score === undefined;
   elements.analysis.textContent = pending
@@ -229,11 +230,11 @@ elements.rematch.addEventListener("click", async () => {
 });
 
 elements.letter.addEventListener("click", async () => {
+  const jobId = state.saved.id;
   try {
-    const response = await message("GENERATE_JOBSTREET_COVER_LETTER", { jobId: state.saved.id });
+    const response = await message("GENERATE_JOBSTREET_COVER_LETTER", { jobId });
     if (!response?.ok) throw new Error(response?.error || "Could not create a draft.");
-    elements.letterOutput.textContent = response.cover_letter;
-    elements.letterOutput.hidden = false;
+    CoverLetterPanel.show(response.cover_letter, response.file_path, jobId);
   } catch (error) {
     setStatus(error.message, "error");
   }

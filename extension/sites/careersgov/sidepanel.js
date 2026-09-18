@@ -14,6 +14,7 @@ const elements = {
   skills: document.querySelector("#skills"),
   resume: document.querySelector("#resume-link"),
   rematch: document.querySelector("#rematch"),
+  letter: document.querySelector("#letter"),
   dashboard: document.querySelector("#dashboard"),
   profile: document.querySelector("#profile"),
   openJobs: document.querySelector("#open-jobs"),
@@ -22,9 +23,9 @@ function setStatus(message, error = false) {
   elements.status.textContent = message;
   elements.status.className = error ? "status error" : "status";
 }
-async function request(path, options = {}) {
+async function request(path, options = {}, timeoutMs = 7000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 7000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(COMPANION_BASE + path, {...options, cache: "no-store", signal: controller.signal});
     const result = await response.json();
@@ -42,6 +43,8 @@ async function activeTab() {
 }
 function populateForm(job, tab) {
   state.job = job; state.tabId = tab.id; state.tabUrl = tab.url; state.savedId = null;
+  CoverLetterPanel.setJob(null);
+  elements.letter.disabled = true;
   for (const input of elements.form.querySelectorAll("[name]")) input.value = job[input.name] || "";
   state.dirty = false;
 }
@@ -65,6 +68,8 @@ async function refreshPreview(force = false) {
   } catch (error) { if (token === state.refreshToken) setStatus(error.message, true); }
 }
 function renderAnalysis(job) {
+  CoverLetterPanel.setJob(job?.id || null);
+  elements.letter.disabled = !job;
   elements.resume.hidden = true;
   elements.resume.removeAttribute("href");
   elements.skills.replaceChildren();
@@ -123,6 +128,17 @@ elements.rematch.addEventListener("click", async () => {
     setStatus("Matching all saved jobs again.");
   } catch (error) { setStatus(error.message, true); }
   finally { elements.rematch.disabled = false; }
+});
+elements.letter.addEventListener("click", async () => {
+  if (!state.savedId) return;
+  const jobId = state.savedId;
+  elements.letter.disabled = true;
+  try {
+    const response = await request(`/api/jobs/${jobId}/cover-letter`,
+      {method: "POST", headers: {"Content-Type": "text/plain"}, body: "{}"}, 30000);
+    CoverLetterPanel.show(response.cover_letter, response.file_path, jobId);
+  } catch (error) { setStatus(error.message, true); }
+  finally { elements.letter.disabled = false; }
 });
 elements.dashboard.addEventListener("click", async () => {
   const tabs = await chrome.tabs.query({url: "http://127.0.0.1:8767/*"});

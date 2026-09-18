@@ -28,7 +28,7 @@ from job_assistant.config import Settings, get_settings
 from shared_tracker.schema import WORKSPACE
 from shared_tracker.tracking import update_tracking
 from shared_tracker.dashboard import render as render_shared_dashboard
-from shared_tracker.autofill_profile import get_profile, save_profile, allowed_extension
+from shared_tracker.autofill_profile import get_profile, save_profile, allowed_extension, allowed_extension_request
 from job_assistant.cover_letter import generate_cover_letter
 from job_assistant.database import JobRepository
 from job_assistant.draft_answers import generate_draft_answers
@@ -40,6 +40,7 @@ from job_assistant.resume_matcher import extract_skills, match_resume_to_job
 from job_assistant.resume_reader import latest_resume, read_resume
 from job_assistant.tailored_resume import create_tailored_resume
 from job_assistant.urls import canonicalize_job_url, is_jobstreet_hostname
+from shared_tracker.cover_letters import save_cover_letter
 
 HOST = "127.0.0.1"
 PORT = 8767
@@ -389,14 +390,14 @@ class CompanionHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.NO_CONTENT)
         self._cors_headers(origin)
         self.send_header("Access-Control-Allow-Methods", "GET, POST")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Job-Assistant-Extension")
         self.send_header("Access-Control-Max-Age", "600")
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802 - standard library handler hook
         origin = self.headers.get("Origin", "")
         if self.path == "/api/autofill-profile":
-            if not allowed_extension(origin):
+            if not allowed_extension_request(origin, self.headers.get("X-Job-Assistant-Extension", "")):
                 self._json(HTTPStatus.FORBIDDEN, {"ok": False, "error": "Open the autofill profile inside your job-assistant extension."})
             else:
                 try:
@@ -470,7 +471,7 @@ class CompanionHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 - standard library handler hook
         origin = self.headers.get("Origin", "")
         if self.path == "/api/autofill-profile":
-            if not allowed_extension(origin):
+            if not allowed_extension_request(origin, self.headers.get("X-Job-Assistant-Extension", "")):
                 self._json(HTTPStatus.FORBIDDEN, {"ok": False, "error": "Only your job-assistant extensions may edit the profile."})
                 return
             try:
@@ -557,7 +558,9 @@ class CompanionHandler(BaseHTTPRequestHandler):
                 job = self.store.get(int(match.group(1)))
                 resume = read_resume(configured_resume(self.store.settings))
                 if match.group(2) == "cover-letter":
-                    self._json(HTTPStatus.OK, {"ok": True, "cover_letter": generate_cover_letter(resume, job)}, origin)
+                    letter = generate_cover_letter(resume, job)
+                    path = save_cover_letter(int(job.id), job.title, job.company, letter)
+                    self._json(HTTPStatus.OK, {"ok": True, "cover_letter": letter, "file_path": str(path)}, origin)
                 else:
                     questions = payload.get("questions", [])
                     if not isinstance(questions, list) or not all(isinstance(item, str) for item in questions):

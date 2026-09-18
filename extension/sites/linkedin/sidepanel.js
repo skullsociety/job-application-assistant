@@ -58,6 +58,7 @@ async function checkCompanion() {
 }
 
 function renderAnalysis(job) {
+  CoverLetterPanel.setJob(job.id);
   state.saved = job;
   const pending = job.match_score === null || job.match_score === undefined;
   elements.analysis.textContent = pending
@@ -133,7 +134,8 @@ chrome.tabs.onActivated.addListener(({ tabId }) => scheduleListingRefresh(tabId)
 elements.auto.addEventListener("change", () => chrome.runtime.sendMessage({ type: "SAVE_LINKEDIN_PROFILE", profile: state.profile || {}, autoCapture: elements.auto.checked }));
 elements.rematch.addEventListener("click", async () => { const r = await chrome.runtime.sendMessage({ type: "REMATCH_LINKEDIN_JOBS" }); setStatus(r?.ok ? `Queued ${r.queued} saved job(s) for matching.` : r?.error || "Matching could not be queued.", r?.ok ? "" : "error"); if (state.saved) { renderAnalysis({ ...state.saved, match_score: null }); pollAnalysis(); } });
 elements.letter.addEventListener("click", async () => {
-  try { const r = await chrome.runtime.sendMessage({ type: "GENERATE_LINKEDIN_COVER_LETTER", jobId: state.saved.id }); if (!r?.ok) throw new Error(r?.error || "Could not create a draft."); elements.letterOutput.textContent = r.cover_letter; elements.letterOutput.hidden = false; }
+  const jobId = state.saved.id;
+  try { const r = await chrome.runtime.sendMessage({ type: "GENERATE_LINKEDIN_COVER_LETTER", jobId }); if (!r?.ok) throw new Error(r?.error || "Could not create a draft."); CoverLetterPanel.show(r.cover_letter, r.file_path, jobId); }
   catch (error) { setStatus(error.message, "error"); }
 });
 elements.start.addEventListener("click", async () => {

@@ -47,3 +47,31 @@ test("only the root worker owns global hotkeys", () => {
     assert.doesNotMatch(worker, /chrome\.commands\.onCommand\.addListener/);
   }
 });
+
+test("all site panels offer the shared copyable cover-letter draft", async () => {
+  for (const site of ["linkedin", "jobstreet", "careersgov"]) {
+    const html = fs.readFileSync(path.join(root, "sites", site, "sidepanel.html"), "utf8");
+    assert.match(html, /cover-letter-panel\.js/);
+    assert.match(html, /id="copy-letter"/);
+    assert.match(html, /id="letter-output"/);
+  }
+  const nodes = Object.fromEntries(["#letter-output", "#copy-letter", "#letter-location"].map(id => [id, {
+    value: "", textContent: "", hidden: true, addEventListener(_event, callback) { this.click = callback; },
+  }]));
+  let copied = "";
+  const context = {
+    document: {querySelector: id => nodes[id]},
+    navigator: {clipboard: {writeText: async text => { copied = text; }}},
+    setTimeout: () => {},
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(root, "cover-letter-panel.js"), "utf8") + "\n globalThis.panel = CoverLetterPanel;", context);
+  context.panel.setJob(12);
+  context.panel.show("Draft for job 12", "local-data/exports/cover_letters/12.txt", 12);
+  await nodes["#copy-letter"].click();
+  assert.equal(copied, "Draft for job 12");
+  context.panel.setJob(13);
+  assert.equal(nodes["#letter-output"].value, "");
+  assert.equal(nodes["#copy-letter"].hidden, true);
+  context.panel.show("Stale draft", "", 12);
+  assert.equal(nodes["#letter-output"].value, "");
+});

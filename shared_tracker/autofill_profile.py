@@ -11,7 +11,13 @@ from .schema import LOCAL_DATA, WORKSPACE
 from .resume_profile import newest_resume, read_resume, parse_resume
 
 PROFILE_PATH = LOCAL_DATA / 'private/autofill-profile.local.json'
-RESUME_DEFAULT_FIELDS = frozenset({'skills', 'education', 'employment'})
+# Only facts explicitly extracted from the newest resume become defaults.
+# Application choices, name order, salary and dates that need inference stay manual.
+RESUME_DEFAULT_FIELDS = frozenset({
+    'full_name', 'email', 'phone', 'linkedin_url', 'website_url', 'website_url_2',
+    'street_name', 'additional_address', 'city', 'postal_code', 'country',
+    'summary', 'skills', 'certifications', 'education', 'employment',
+})
 TEXT_FIELDS = ('prefix','full_name','first_name','last_name','email','phone','phone_device_type','country','city',
                'street_name','additional_address','address_line1','postal_code','linkedin_url','website_url','website_url_2',
                'expected_salary','salary_currency','notice_period','gender','date_of_birth','country_of_birth','ethnicity',
@@ -31,6 +37,15 @@ def allowed_extension(origin: str) -> bool:
     try: allowed = json.loads(manifest.read_text(encoding='utf-8'))['allowed_origins']
     except (OSError, ValueError, KeyError): return False
     return origin.rstrip('/') + '/' in allowed and origin.startswith('chrome-extension://')
+
+
+def allowed_extension_request(origin: str, extension_id: str) -> bool:
+    """Accept privileged extension fetches that omit Origin, not web origins."""
+    if origin:
+        return allowed_extension(origin)
+    if not extension_id or len(extension_id) != 32 or any(letter not in 'abcdefghijklmnop' for letter in extension_id):
+        return False
+    return allowed_extension('chrome-extension://' + extension_id)
 
 
 def validate_saved(value: dict) -> dict:
@@ -94,18 +109,38 @@ def get_profile(path: Path = PROFILE_PATH, folders: list[Path] | None = None) ->
         effective = {**{key: '' for key in TEXT_FIELDS}, 'education': [], 'employment': [], **defaults, **saved['overrides']}
         if effective['first_name'] and effective['last_name']:
             warnings = [warning for warning in warnings if not warning.startswith('Given/family name order')]
-        result = {**saved, 'defaults': defaults, 'profile': effective, 'source': source, 'warnings': warnings}
+        result = {**saved, 'defaults': defaults, 'profile': effective, 'source': source, 'warnings': warnings,
+                  'storage_revision': _storage_revision(saved)}
         result['revision'] = hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest()
         return result
 
 
+def _storage_revision(saved: dict) -> str:
+    """Track edits to saved answers independently of resume-derived defaults."""
+    return hashlib.sha256(json.dumps(saved, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
+
+
 def save_profile(value: dict, path: Path = PROFILE_PATH) -> dict:
-    saved = validate_saved(value)
+    if not isinstance(value, dict):
+        raise ValueError('Reload the autofill profile before saving.')
+    base_revision = value.get('base_storage_revision')
+    if not isinstance(base_revision, str) or len(base_revision) != 64:
+        raise ValueError('Reload the autofill profile before saving. No changes were saved.')
+    saved = validate_saved({key: item for key, item in value.items() if key != 'base_storage_revision'})
     with _lock:
+        current = validate_saved(json.loads(path.read_text(encoding='utf-8'))) if path.exists() else validate_saved({})
+        if _storage_revision(current) != base_revision:
+            raise ValueError('The autofill profile changed in another tab. Reload it before saving. No changes were saved.')
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_name('.profile-' + uuid4().hex + '.tmp')
+        backup_temporary = path.with_name('.profile-backup-' + uuid4().hex + '.tmp')
         try:
             temporary.write_text(json.dumps(saved, ensure_ascii=False, indent=2), encoding='utf-8')
+            if path.exists():
+                backup_temporary.write_bytes(path.read_bytes())
+                backup_temporary.replace(path.with_name(path.name + '.bak'))
             temporary.replace(path)
-        finally: temporary.unlink(missing_ok=True)
+        finally:
+            temporary.unlink(missing_ok=True)
+            backup_temporary.unlink(missing_ok=True)
     return get_profile(path)

@@ -34,6 +34,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .skills span { display: inline-block; margin: 0 4px 4px 0; padding: 4px 7px; border-radius: 999px; color: #46556a; background: #edf3f8; font-size: 10px; font-weight: 650; }
 #resume-link { display: block; margin-top: 5px; color: #087a55; font-size: 12px; font-weight: 750; text-decoration: none; }
 .draft-output { margin-top: 10px; padding: 10px; overflow-wrap: anywhere; border: 1px solid #dbe4ed; border-radius: 8px; color: #35455b; background: #f8fafc; font-size: 11px; line-height: 1.45; white-space: pre-wrap; }
+.cover-letter-card > p { color: #46556a; font-size: 11px; line-height: 1.45; }
+.cover-letter-card textarea { display: block; width: 100%; min-height: 190px; resize: vertical; }
+.letter-location { overflow-wrap: anywhere; }
 .related-job { display: block; margin-top: 8px; padding: 9px; border-radius: 8px; color: #1f5d87; background: #eef5f9; font-size: 11px; line-height: 1.4; text-decoration: none; }
 .related-job strong, .related-job small { display: block; }
 .related-job small { margin-top: 2px; color: #657386; }

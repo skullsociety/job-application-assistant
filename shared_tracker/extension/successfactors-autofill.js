@@ -7,6 +7,7 @@
   const mine = chrome.runtime.id;
   let running = false, scheduled, profile, fetchedAt = 0, dismissed = false, profileRevision = '';
   let attemptedSkills = new WeakMap();
+  let failedDropdowns = new Set();
   const userEdited = new WeakSet(), additions = new WeakSet();
   const visible = el => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
   const text = el => el?.innerText || el?.textContent || '';
@@ -23,7 +24,18 @@
   function identity(el) {
     const labels = [...(el.labels || [])].map(text).join(' ');
     const labelled = (el.getAttribute('aria-labelledby') || '').split(/\s+/).map(id => text(document.getElementById(id))).join(' ');
-    return (labels || labelled || el.getAttribute('aria-label') || el.placeholder || el.name || el.id || '').trim().replace(/\*\s*$/, '');
+    let nearby = '';
+    if (!labels && !labelled) {
+      let root = el.parentElement;
+      while (root && root !== document.body) {
+        const inputs = [...root.querySelectorAll('input,textarea,select,[role="combobox"]')].filter(visible);
+        if (inputs.length > 1) break;
+        const fieldLabels = root.querySelectorAll('label,[data-automation-id="formLabel"]');
+        if (inputs.length === 1 && fieldLabels.length === 1) { nearby = text(fieldLabels[0]); break; }
+        root = root.parentElement;
+      }
+    }
+    return (labels || labelled || nearby || el.getAttribute('aria-label') || el.placeholder || el.name || el.id || '').trim().replace(/\*\s*$/, '');
   }
   function heading(el) {
     const labelled = (el.getAttribute('aria-labelledby') || '').split(/\s+/).map(id => text(document.getElementById(id))).join(' ');
@@ -38,6 +50,17 @@
       root = root.parentElement;
     }
     return {section: '', root: document.body};
+  }
+  function numberedHistoryIndex(el, section) {
+    if (!section) return null;
+    const names = section === 'employment' ? /\b(?:work experience|work history|employment)\s+(\d+)\b/ : /\b(?:education|qualification)\s+(\d+)\b/;
+    let root = el.parentElement;
+    while (root && root !== document.body) {
+      const match = heading(root).match(names);
+      if (match) return Number(match[1]) - 1;
+      root = root.parentElement;
+    }
+    return null;
   }
   function accountScreen() {
     if (controls().some(el => el.type === 'password')) return true;
@@ -63,6 +86,7 @@
     if (el.type === 'month') return value.length >= 7 ? value.slice(0,7) : null;
     if (el.type === 'date') return value.length === 10 ? value : null;
     const format = core.norm(el.placeholder || el.getAttribute('aria-label'));
+    if (/^(yyyy|year)$/.test(format)) return value.slice(0,4);
     if (/dd.*mm.*yyyy/.test(format)) return value.length === 10 ? value.slice(8,10)+'/'+value.slice(5,7)+'/'+value.slice(0,4) : null;
     if (/mm.*dd.*yyyy/.test(format)) return value.length === 10 ? value.slice(5,7)+'/'+value.slice(8,10)+'/'+value.slice(0,4) : null;
     if (/mm.*yyyy/.test(format)) return value.length >= 7 ? value.slice(5,7)+'/'+value.slice(0,4) : null;
@@ -87,7 +111,9 @@
     if (!left.startsWith(right + ' ')) return false;
     return /^(programming language|python library|software|tool|technology|database|framework|skill)$/.test(left.slice(right.length + 1));
   };
-  async function dropdown(el, value, skillMode = false) {
+  async function dropdown(el, value, skillMode = false, choiceKey = '', force = false) {
+    // An unmatched Workday choice must not be reopened on every background scan.
+    if (!skillMode && !force && failedDropdowns.has(choiceKey)) return false;
     const original = el.value || '';
     const scope = skillMode ? skillScope(el) : el.closest('.select2-container,.sapMInputBase,.form-group,.field,td,[data-automation-id="formField"]') || el.parentElement;
     const alreadySelected = skillMode ? selectedSkills(el).some(tag => sameSkill(tag, value))
@@ -96,11 +122,13 @@
     if ((!skillMode && el instanceof HTMLButtonElement && core.optionMatch(text(el), value)) || alreadySelected) return true;
     el.click();
     if (el.tagName === 'INPUT') nativeSet(el, String(value));
+    let sawChoices = false;
     for (let attempt = 0; attempt < 12; attempt++) {
       const controlled = el.getAttribute('aria-controls') || el.getAttribute('aria-owns');
       const list = controlled ? document.getElementById(controlled.split(' ')[0]) : null;
       const options = [...(list || document).querySelectorAll('[role="option"],.ui-autocomplete li,.select2-results__option')]
         .filter(option => visible(option) && (!skillMode || !/selected/.test(core.norm(option.closest('[role="listbox"]')?.getAttribute('aria-label')))));
+      if (options.length) sawChoices = true;
       const exact = options.find(option => core.optionMatch(text(option), value));
       const option = exact || (skillMode ? options.find(option => sameSkill(text(option), value)) : null);
       if (option && option.getAttribute('aria-disabled') !== 'true') {
@@ -110,15 +138,28 @@
           || el.getAttribute('aria-expanded') === 'false'
           || (skillMode ? selectedSkills(el).some(tag => core.optionMatch(tag, selectedValue))
             : [...scope.querySelectorAll('[role="listitem"],.select2-selection__choice,.sapMTokenText,[data-automation-id="selectedItem"]')].some(tag => core.optionMatch(text(tag).replace(/^[×x]\s*/, ''), value)));
-        if (committed) return true;
+        if (committed) {
+          failedDropdowns.delete(choiceKey);
+          return true;
+        }
       }
       await pause(90);
     }
+    if (skillMode && !sawChoices && el.tagName === 'INPUT') {
+      // Free-text skill pickers commit one query at a time with Enter.
+      el.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', bubbles: true, cancelable: true}));
+      el.dispatchEvent(new KeyboardEvent('keyup', {key: 'Enter', code: 'Enter', bubbles: true}));
+      await pause(120);
+      if (selectedSkills(el).some(tag => sameSkill(tag, value))) return true;
+    }
     if (el.tagName === 'INPUT') nativeSet(el, original);
     el.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    if (el.getAttribute('aria-expanded') === 'true' && el.tagName !== 'INPUT') el.click();
+    el.blur();
+    if (!skillMode) failedDropdowns.add(choiceKey);
     return false;
   }
-  async function fill(el, value, label, force = false) {
+  async function fill(el, value, label, force = false, choiceKey = '') {
     if (value === null || value === undefined || value === '' || (!force && userEdited.has(el))) return false;
     if (['password','hidden','file','submit','image'].includes(el.type)) return false;
     if (el.type === 'radio') {
@@ -132,14 +173,18 @@
       if (typeof value !== 'boolean' || el.checked === value || !/current|work here|still employ/.test(core.norm(label))) return false;
       el.click(); return el.checked === value;
     }
-    if (!force && !empty(el)) return false;
+    const skillMode = core.skillsLabel(label);
+    const staleSkillList = skillMode && String(value).includes(',') && String(el.value || '').trim() === String(value).trim();
+    if (!force && !empty(el) && !staleSkillList) return false;
+    if (staleSkillList) nativeSet(el, '');
     if (el instanceof HTMLSelectElement) {
       const option = [...el.options].find(option => !option.disabled && core.optionMatch(text(option), value));
       if (!option) return false;
       nativeSet(el, option.value); return el.value === option.value;
     }
-    if (el.getAttribute('role') === 'combobox' || el.getAttribute('aria-autocomplete') || el.getAttribute('aria-haspopup') === 'listbox' || el.classList.contains('ui-autocomplete-input')) {
-      const skillMode = core.skillsLabel(label), multiMode = skillMode || core.multiValueLabel(label);
+    if (el.getAttribute('role') === 'combobox' || el.getAttribute('aria-autocomplete') || el.getAttribute('aria-haspopup') === 'listbox' || el.classList.contains('ui-autocomplete-input')
+      || (skillMode && /\.myworkdayjobs\.com$/i.test(location.hostname))) {
+      const multiMode = skillMode || core.multiValueLabel(label);
       const values = multiMode ? String(value).split(',').map(x => x.trim()).filter(Boolean) : [value];
       let committed = 0;
       const attempted = attemptedSkills.get(el) || new Set(); attemptedSkills.set(el, attempted);
@@ -147,7 +192,7 @@
       for (const item of values) {
         if (skillMode && (selectedSkills(el).some(selected => sameSkill(selected, item)) || attempted.has(core.norm(item)))) continue;
         if (skillMode) attempted.add(core.norm(item));
-        if (await dropdown(el, item, skillMode)) committed++;
+        if (await dropdown(el, item, skillMode, choiceKey, force)) committed++;
         if (skillMode && ++processed >= 12) break;
       }
       return committed > 0;
@@ -186,8 +231,11 @@
     for (const button of [...document.querySelectorAll('button,a[role="button"],input[type="button"]')].filter(visible)) {
       if (additions.has(button)) continue;
       const label = core.norm(text(button) || button.value || button.getAttribute('aria-label'));
-      if (!/^add(?: another| new)? (education|qualification|employment|work experience|work history)(?: entry)?$/.test(label)) continue;
-      const section = /education|qualification/.test(label) ? 'education' : 'employment';
+      const named = /^add(?: another| new)? (education|qualification|employment|work experience|work history)(?: entry)?$/.test(label);
+      if (!named && label !== 'add another') continue;
+      // Workday labels these buttons only "Add Another"; use the containing form section.
+      const section = named ? (/education|qualification/.test(label) ? 'education' : 'employment') : context(button).section;
+      if (!section) continue;
       const count = fields.filter(el => context(el).section === section && /school|institution|university|employer|company/.test(core.norm(identity(el)))).length;
       if (count < (profile.profile[section] || []).length) {
         additions.add(button); button.click(); await pause(200);
@@ -205,7 +253,10 @@
       if (!profile || Date.now() - fetchedAt > 8000) {
         const response = await chrome.runtime.sendMessage({type:'GET_SF_PROFILE'});
         if (!response?.ok) throw new Error(response?.error || 'Start the shared Chrome helper.');
-        if (profileRevision && profileRevision !== response.revision) attemptedSkills = new WeakMap();
+        if (profileRevision && profileRevision !== response.revision) {
+          attemptedSkills = new WeakMap();
+          failedDropdowns = new Set();
+        }
         profile = response; profileRevision = response.revision; fetchedAt = Date.now();
       }
       if (!profile.enabled) { notice('Application autofill is off.'); return; }
@@ -217,12 +268,15 @@
         const label = identity(el), ctx = context(el);
         if (!label || core.protectedQuestion(label)) continue;
         let index = ctx.section ? roots[ctx.section].indexOf(ctx.root) : 0;
-        if (ctx.section && roots[ctx.section].length === 1) {
+        const numberedIndex = numberedHistoryIndex(el, ctx.section);
+        if (numberedIndex !== null) index = numberedIndex;
+        if (ctx.section && roots[ctx.section].length === 1 && numberedIndex === null) {
           const key = ctx.section + ':' + core.norm(label);
           index = occurrence.get(key) || 0; occurrence.set(key, index + 1);
         }
         const value = core.answer(label, ctx.section, index, profile);
-        if (await fill(el, value, label, force)) filled++;
+        const choiceKey = [location.href, ctx.section, index, core.norm(label), core.norm(value)].join('|');
+        if (await fill(el, value, label, force, choiceKey)) filled++;
         else if (empty(el) && (el.required || el.getAttribute('aria-required') === 'true')) unresolved++;
       }
       await expandHistory(fields);

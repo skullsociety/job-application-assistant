@@ -34,6 +34,7 @@ from job_assistant.resume_matcher import extract_skills, match_resume_to_job
 from job_assistant.resume_reader import latest_resume, read_resume
 from job_assistant.tailored_resume import create_tailored_resume
 from job_assistant.urls import canonicalize_job_url, is_linkedin_hostname
+from shared_tracker.cover_letters import save_cover_letter
 
 HOST = "127.0.0.1"
 PORT = 8766
@@ -457,7 +458,9 @@ class CompanionHandler(BaseHTTPRequestHandler):
                 job = self.store.get(int(match.group(1)))
                 resume = read_resume(configured_resume(self.store.settings))
                 if match.group(2) == "cover-letter":
-                    self._json(HTTPStatus.OK, {"ok": True, "cover_letter": generate_cover_letter(resume, job)}, origin)
+                    letter = generate_cover_letter(resume, job)
+                    path = save_cover_letter(int(job.id), job.title, job.company, letter)
+                    self._json(HTTPStatus.OK, {"ok": True, "cover_letter": letter, "file_path": str(path)}, origin)
                 else:
                     questions = payload.get("questions", [])
                     if not isinstance(questions, list) or not all(isinstance(item, str) for item in questions):

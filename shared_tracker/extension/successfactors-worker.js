@@ -7,9 +7,10 @@ importScripts('successfactors-core.js');
   }
   async function fetchProfile(options) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch(PROFILE_URL, {cache: 'no-store', signal: controller.signal, ...options});
+      const response = await fetch(PROFILE_URL, {cache: 'no-store', signal: controller.signal, ...options,
+        headers: {'X-Job-Assistant-Extension': chrome.runtime.id, ...(options.headers || {})}});
       const value = await response.json();
       if (!response.ok || !value.ok) throw new Error(value.error || 'The autofill profile could not be loaded.');
       return value;
@@ -17,6 +18,16 @@ importScripts('successfactors-core.js');
   }
   function editor(sender) { return sender.url?.split('?')[0] === chrome.runtime.getURL('autofill-profile.html'); }
   async function request(options = {}) {
+    if (options.method === 'POST') {
+      // Check connectivity first. A timed-out POST may already have committed,
+      // so never silently send the same full-profile replacement twice.
+      try { await fetchProfile(); }
+      catch {
+        if (!globalThis.JobAssistantLifecycle?.start) throw new Error('Reload this extension after running the suite setup.');
+        await timeout(globalThis.JobAssistantLifecycle.start(), 12000, 'The Chrome helper did not start within 12 seconds. Run the suite setup and reload this extension.');
+      }
+      return fetchProfile(options);
+    }
     try {
       return await fetchProfile(options);
     } catch {

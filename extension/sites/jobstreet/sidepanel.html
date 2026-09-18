@@ -51,8 +51,15 @@
       <p id="analysis-summary">Save a job to compare it with your newest resume.</p>
       <div id="skills" class="skills" hidden></div>
       <a id="resume-link" hidden target="_blank" rel="noreferrer">Open tailored PDF resume</a>
-      <button id="letter" class="secondary" type="button" disabled>Generate cover-letter draft</button>
-      <div id="letter-output" class="draft-output" hidden></div>
+    </section>
+
+    <section class="card cover-letter-card">
+      <h2>Cover letter</h2>
+      <p>Drafted from this job description and skills found in your newest resume. Review before using.</p>
+      <button id="letter" class="secondary" type="button" disabled>Generate and save .txt draft</button>
+      <textarea id="letter-output" class="draft-output" rows="12" readonly aria-label="Cover-letter draft" hidden></textarea>
+      <button id="copy-letter" class="secondary" type="button" hidden>Copy cover letter</button>
+      <p id="letter-location" class="letter-location"></p>
     </section>
 
     <section class="card related-card">
@@ -67,6 +74,7 @@
     </section>
   </main>
   <footer>Only the current visible job-detail page is captured. Credentials, verification data, application forms, and final submissions remain manual.</footer>
+  <script src="../../cover-letter-panel.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>

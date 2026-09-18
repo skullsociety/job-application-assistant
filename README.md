@@ -24,6 +24,7 @@ The three local adapters use ports 8765–8767, but they all use one database an
 - Excel tracker: `local-data/exports/job_tracker.xlsx`
 - Source resumes: `local-data/resumes/`
 - Tailored resumes: `local-data/exports/tailored_resumes/`
+- Cover-letter text drafts: `local-data/exports/cover_letters/`
 - Editable autofill profile: `local-data/private/autofill-profile.local.json`
 - Troubleshooting logs: `local-data/logs/`
 
@@ -44,9 +45,15 @@ The side panel detects the active website and displays its matching capture inte
 
 Only the follow-up date is displayed. Entering a date stores **Followed Up = Yes**; clearing it stores **No**. The derived field remains in the database and Excel export.
 
-Put a new text-readable PDF or DOCX resume in `local-data/resumes/`. The newest resume supplies skills, education and employment only. Open **Autofill profile** from the extension, enter contact and application details manually, and review the extracted resume history. Saved values remain private on this computer.
+Put a new text-readable PDF or DOCX resume in `local-data/resumes/`. The newest resume supplies facts it explicitly contains, such as a name, contact details, skills, education and employment. Missing or uncertain details stay blank. Open **Autofill profile** from the extension, fill any blanks manually, and review the extracted values. Your saved edits take priority over resume defaults and remain private on this computer.
+
+The autofill editor shows its fields only after it has loaded your saved values. If the local assistant is unavailable, use **Retry loading**; the editor will not let a blank loading screen overwrite your saved answers. If the profile changed in another tab, reload before saving. Each successful save keeps the previous profile as `local-data/private/autofill-profile.local.json.bak` for recovery.
+
+If the editor says it cannot load saved answers after an update, fully exit Chrome and restart the local companions before reloading the unpacked extension at `chrome://extensions`. A still-running older companion cannot serve a newer profile format. The editor keeps Save unavailable until it receives the current profile.
 
 The autofill preserves existing answers and never submits an application. Passwords, verification, declarations, file uploads, Save/Continue and final submission stay manual. Review every generated answer before using it.
+
+After capturing a job, open its **Cover letter** section in the extension and click **Generate and save .txt draft**. The draft uses the captured job description and only skills recognized in both that description and your newest resume. It is saved under `local-data/exports/cover_letters/` with the job ID at the start of the filename. Review the draft, then click **Copy cover letter** to paste it into an application. Generating again updates that job's draft file.
 
 ## GitHub and privacy
 

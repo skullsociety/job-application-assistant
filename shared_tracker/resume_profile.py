@@ -87,6 +87,7 @@ def parse_resume(text: str) -> tuple[dict, list[str]]:
         'street_name': labelled(r'street name|street address|address line 1|address'),
         'additional_address': labelled(r'additional address|address line 2'),
         'city': labelled(r'city|town'), 'postal_code': labelled(r'postal code|postcode|zip code'),
+        'country': labelled(r'country|country of residence'),
         'summary': clean(' '.join(sections['summary'])).rstrip(' .'),
     }
     # Remove category headings, then keep the actual skill phrases.

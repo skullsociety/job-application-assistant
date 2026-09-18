@@ -21,6 +21,7 @@ from .matching import extract_skills, match_resume
 from .resume_tools import create_tailored_resume, latest_resume, read_resume
 from .tracker import CAPTURE_FIELDS, SHARED_COLUMNS, description_hash, optional_http_url, public_job, validate_tracking
 from shared_tracker.schema import DATABASE_PATH, EXTRA_COLUMNS, LOCAL_DATA, normalize_shared_rows
+from shared_tracker.cover_letters import generate_cover_letter, save_cover_letter
 
 HOST = "127.0.0.1"
 PORT = 8765
@@ -453,6 +454,27 @@ class CompanionHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
         origin = self.headers.get("Origin", "")
+        letter_match = re.fullmatch(r"/api/jobs/(\d+)/cover-letter", self.path)
+        if letter_match:
+            if not _is_extension_origin(origin):
+                self._send_json(HTTPStatus.FORBIDDEN, {"ok": False, "error": "Use the installed Chrome extension."})
+                return
+            try:
+                job = self.store.get(int(letter_match[1]))
+                _, resume = self.store._latest_resume_text()
+                match = match_resume(resume, str(job["title"]), str(job.get("job_description") or job.get("description") or ""))
+                letter = generate_cover_letter(str(job["title"]), str(job["company"]),
+                                               str(job.get("job_description") or job.get("description") or ""),
+                                               match.matching_skills)
+                path = save_cover_letter(int(job["id"]), str(job["title"]), str(job["company"]), letter)
+                self._send_json(HTTPStatus.OK, {"ok": True, "cover_letter": letter, "file_path": str(path)}, origin)
+            except KeyError:
+                self._send_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "This job no longer exists."}, origin)
+            except (ValueError, FileNotFoundError) as exc:
+                self._send_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)}, origin)
+            except Exception:
+                self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": "Could not create the cover letter."}, origin)
+            return
         tracking_match = re.fullmatch(r"/api/jobs/(\d+)/(tracking|application|follow-up)", self.path)
         if tracking_match or self.path == "/api/jobs/rematch":
             if not (_is_extension_origin(origin) or _is_dashboard_origin(origin)):

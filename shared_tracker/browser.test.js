@@ -4,13 +4,20 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const {chromium} = require(require.resolve('playwright', {paths:[process.env.JOB_ASSISTANT_NODE_MODULES || path.join(__dirname,'../linkedin/node_modules')]}));
 const asset = file => path.join(__dirname,'extension',file);
-const profile = {ok:true,enabled:true,revision:'one',defaults:{full_name:'Alex Example',education:[{qualification:'Degree',institution:'Example University',end_date:'2020-06'}],employment:[]},overrides:{},custom_answers:[],source:{name:'example.pdf'},warnings:[],profile:{full_name:'Alex Example',first_name:'Alex',email:'alex@example.org',country:'Singapore',skills:'Python, SQL',education:[{institution:'Example University',qualification:'Degree',end_date:'2020-06'}],employment:[{employer:'Example Ltd',job_title:'Analyst',current:true},{employer:'Previous Ltd',job_title:'Engineer',current:false}]}};
+const profile = {ok:true,enabled:true,revision:'one',storage_revision:'storage-one',defaults:{full_name:'Alex Example',education:[{qualification:'Degree',institution:'Example University',end_date:'2020-06'}],employment:[]},overrides:{},custom_answers:[],source:{name:'example.pdf'},warnings:[],profile:{full_name:'Alex Example',first_name:'Alex',email:'alex@example.org',country:'Singapore',skills:'Python, SQL',education:[{institution:'Example University',qualification:'Degree',end_date:'2020-06'}],employment:[{employer:'Example Ltd',job_title:'Analyst',current:true},{employer:'Previous Ltd',job_title:'Engineer',current:false}]}};
 async function browserPage(html, url = 'https://career.successfactors.com/application', testProfile = profile) {
   const browser = await chromium.launch({channel:'chrome', headless:true});
   const page = await browser.newPage();
   await page.route('**/*', route => route.fulfill({contentType:'text/html',body:html}));
   await page.goto(url);
   await page.evaluate(data => {window.testData=data;window.chrome={runtime:{id:'test',sendMessage:async message=>{if(message.type==='SAVE_SF_PROFILE'){window.saved=message.value;}return window.testData;}}};}, testProfile);
+  if (url === 'https://local.invalid/profile') await page.evaluate(() => {
+    window.fetch = async (_requestUrl, options = {}) => {
+      window.lastProfileRequest = {url: String(_requestUrl), headers: options.headers};
+      if (options.method === 'POST') window.saved = JSON.parse(options.body);
+      return {ok: true, json: async () => window.testData};
+    };
+  });
   return {browser,page};
 }
 test('fills text, real options, repeated history; skips unknown dates and existing answers', async () => {
@@ -90,28 +97,217 @@ test('Workday selects profile choices and commits available resume skills as chi
     assert.deepEqual(await page.locator('#selected [role=option]').allTextContents(),['Amazon Web Services (AWS)','Python (Programming Language)','SQL']);
   } finally {await browser.close();}
 });
+test('Workday plain skill picker commits each saved skill with Enter, not commas', async () => {
+  const testProfile = {...profile,revision:'plain-skills',profile:{...profile.profile,skills:'Python, SQL, PostgreSQL'}};
+  const {browser,page} = await browserPage(`<form><h1>Application</h1>
+    <div data-automation-id="formField-skills"><label for="skills">Type to Add Skills</label>
+      <input id="skills" value="Python, SQL, PostgreSQL"><div id="tokens"></div></div>
+    <button type="submit">Save and Continue</button></form>`,
+    'https://tenant.myworkdayjobs.com/application', testProfile);
+  try {
+    await page.evaluate(() => {
+      window.enteredSkills = []; window.submitted = false;
+      document.querySelector('form').onsubmit = event => { event.preventDefault(); window.submitted = true; };
+      skills.addEventListener('keydown', event => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        const skill = skills.value;
+        window.enteredSkills.push(skill);
+        const tag = document.createElement('span'); tag.role = 'listitem'; tag.textContent = skill;
+        tokens.append(tag); skills.value = '';
+      });
+    });
+    await page.addScriptTag({path:asset('successfactors-core.js')});
+    await page.addScriptTag({path:asset('successfactors-autofill.js')});
+    await page.waitForFunction(() => document.querySelectorAll('#tokens [role="listitem"]').length === 3,
+      null, {timeout:10000});
+    assert.deepEqual(await page.evaluate(() => enteredSkills), ['Python','SQL','PostgreSQL']);
+    assert.equal(await page.locator('#skills').inputValue(), '');
+    assert.equal(await page.evaluate(() => submitted), false);
+  } finally {await browser.close();}
+});
+test('Workday leaves an unmatched degree choice alone for manual selection', async () => {
+  const testProfile = {...profile,revision:'degree',profile:{...profile.profile,education:[{qualification:'Bachelor of Engineering'}]}};
+  const {browser,page} = await browserPage(`<form><h1>Application</h1><section><h2>Education</h2>
+    <label>Institution<input></label><label>From<input></label>
+    <button type="button" id="degree" aria-label="Degree" aria-haspopup="listbox" aria-expanded="false">Select One</button>
+    <ul id="degrees" role="listbox"></ul></section></form>`, 'https://tenant.myworkdayjobs.com/application', testProfile);
+  try {
+    await page.evaluate(() => {
+      window.degreeOpens = 0;
+      degree.onclick = () => {
+        const open = degree.getAttribute('aria-expanded') !== 'true';
+        degree.setAttribute('aria-expanded', String(open));
+        degrees.replaceChildren();
+        if (!open) return;
+        window.degreeOpens++;
+        for (const value of ['Primary/Elementary', 'Secondary/High School']) {
+          const option = document.createElement('li'); option.role = 'option'; option.textContent = value;
+          option.onclick = () => { degree.textContent = value; degree.setAttribute('aria-expanded', 'false'); degrees.replaceChildren(); };
+          degrees.append(option);
+        }
+      };
+    });
+    await page.addScriptTag({path:asset('successfactors-core.js')});
+    await page.addScriptTag({path:asset('successfactors-autofill.js')});
+    await page.waitForFunction(() => document.querySelector('[data-summary]')?.textContent.includes('Review before saving'));
+    assert.equal(await page.evaluate(() => degreeOpens), 1);
+    assert.equal(await page.locator('#degree').getAttribute('aria-expanded'), 'false');
+    await page.evaluate(() => SuccessFactorsAutofill.scan());
+    assert.equal(await page.evaluate(() => degreeOpens), 1);
+    await page.locator('#degree').click();
+    await page.getByRole('option', {name:'Secondary/High School'}).click();
+    await page.evaluate(() => SuccessFactorsAutofill.scan());
+    assert.equal(await page.locator('#degree').textContent(), 'Secondary/High School');
+    assert.equal(await page.locator('#degree').getAttribute('aria-expanded'), 'false');
+  } finally {await browser.close();}
+});
+test('Workday year-only education inputs take the year from resume dates', async () => {
+  const testProfile = {...profile,revision:'education-years',profile:{...profile.profile,
+    education:[{institution:'Example University',start_date:'2018-08',end_date:'2022-06'}]}};
+  const {browser,page} = await browserPage(`<form><h1>Application</h1><section><h2>Education</h2>
+    <label>From<input id="from-year" placeholder="YYYY" maxlength="4"></label>
+    <label>To (Actual or Expected)<input id="to-year" placeholder="YYYY" maxlength="4"></label>
+  </section></form>`, 'https://tenant.myworkdayjobs.com/application', testProfile);
+  try {
+    await page.addScriptTag({path:asset('successfactors-core.js')});
+    await page.addScriptTag({path:asset('successfactors-autofill.js')});
+    await page.waitForFunction(() => document.querySelector('#to-year').value === '2022');
+    assert.equal(await page.locator('#from-year').inputValue(), '2018');
+    assert.equal(await page.locator('#to-year').inputValue(), '2022');
+  } finally {await browser.close();}
+});
+test('Workday Add Another creates and fills remaining work and education entries', async () => {
+  const testProfile = {...profile,revision:'history',profile:{...profile.profile,
+    employment:[{employer:'Current Co',job_title:'Analyst'},{employer:'Earlier Co',job_title:'Engineer'}],
+    education:[{institution:'Recent University'},{institution:'Earlier College'}]}};
+  const {browser,page} = await browserPage(`<form><h1>My Experience</h1>
+    <section id="work"><h2>Work Experience</h2><div class="entry"><h3>Work Experience 1</h3>
+      <label>Job Title<input></label><label>Company<input></label></div>
+      <button type="button" id="add-work">Add Another</button></section>
+    <section id="education"><h2>Education</h2><div class="entry"><h3>Education 1</h3>
+      <label>Institution<input></label><label>Degree<input></label></div>
+      <button type="button" id="add-education">Add Another</button></section>
+    <section><h2>Other Information</h2><label>Other<input></label><label>Detail<input></label>
+      <button type="button" id="add-unrelated">Add Another</button></section></form>`,
+    'https://tenant.myworkdayjobs.com/application', testProfile);
+  try {
+    await page.evaluate(() => {
+      window.unrelatedClicks = 0;
+      document.querySelector('#add-unrelated').onclick = () => { window.unrelatedClicks++; };
+      for (const [section, heading, labels] of [
+        ['work','Work Experience',['Job Title','Company']],
+        ['education','Education',['Institution','Degree']]
+      ]) document.querySelector('#add-' + section).onclick = () => {
+        const root = document.querySelector('#' + section);
+        const entry = document.createElement('div'); entry.className = 'entry';
+        const title = document.createElement('h3'); title.textContent = heading + ' 2'; entry.append(title);
+        for (const name of labels) {
+          const label = document.createElement('label'); label.textContent = name;
+          label.append(document.createElement('input')); entry.append(label);
+        }
+        root.insertBefore(entry, document.querySelector('#add-' + section));
+      };
+    });
+    await page.addScriptTag({path:asset('successfactors-core.js')});
+    await page.addScriptTag({path:asset('successfactors-autofill.js')});
+    await page.waitForFunction(() => document.querySelectorAll('#work .entry').length === 2
+      && document.querySelectorAll('#education .entry').length === 2
+      && document.querySelectorAll('#work .entry')[1].querySelector('input').value === 'Engineer'
+      && document.querySelectorAll('#education .entry')[1].querySelector('input').value === 'Earlier College');
+    assert.deepEqual(await page.locator('#work .entry input').evaluateAll(inputs => inputs.map(input => input.value)),
+      ['Analyst','Current Co','Engineer','Earlier Co']);
+    assert.deepEqual(await page.locator('#education .entry input').evaluateAll(inputs => inputs.map(input => input.value)),
+      ['Recent University','','Earlier College','']);
+    assert.equal(await page.evaluate(() => unrelatedClicks), 0);
+  } finally {await browser.close();}
+});
+test('Workday numbered history entries keep resume order and fill month/year dates', async () => {
+  const testProfile = {...profile,revision:'numbered-history',profile:{...profile.profile,
+    employment:[
+      {job_title:'Newest role',employer:'Newest Co',start_date:'2024-11',end_date:'2026-10'},
+      {job_title:'Previous role',employer:'Previous Co',start_date:'2023-03',end_date:'2024-11'},
+      {job_title:'Older role',employer:'Older Co',start_date:'2022-07',end_date:'2022-09'}],
+    education:[
+      {institution:'Newest University',start_date:'2022-07'},
+      {institution:'Previous College',start_date:'2020-04'},
+      {institution:'Older School',start_date:'2010-04'}]}};
+  const workEntry = number => `<div class="entry"><h3>Work Experience ${number}</h3>
+    <label>Job Title<input class="title"></label><label>Company<input class="company"></label>
+    <div data-automation-id="formField-startDate"><span data-automation-id="formLabel">From*</span>
+      <input class="from" aria-label="MM/YYYY" placeholder="MM/YYYY"></div>
+    <div data-automation-id="formField-endDate"><span data-automation-id="formLabel">To*</span>
+      <input class="to" aria-label="MM/YYYY" placeholder="MM/YYYY"></div></div>`;
+  const educationEntry = number => `<div class="entry"><h3>Education ${number}</h3>
+    <label>Institution<input class="institution"></label><label>Degree<input></label></div>`;
+  const {browser,page} = await browserPage(`<form><h1>My Experience</h1>
+    <section id="work"><h2>Work Experience</h2>${workEntry(1)}
+      <label>Section notes<input></label>${workEntry(2)}</section>
+    <section id="education"><h2>Education</h2>${educationEntry(1)}
+      <label>Section notes<input></label>${educationEntry(2)}</section></form>`,
+    'https://tenant.myworkdayjobs.com/application', testProfile);
+  try {
+    await page.addScriptTag({path:asset('successfactors-core.js')});
+    await page.addScriptTag({path:asset('successfactors-autofill.js')});
+    await page.waitForFunction(() => document.querySelectorAll('#work .title')[1].value === 'Previous role'
+      && document.querySelectorAll('#work .to')[1].value === '11/2024'
+      && document.querySelectorAll('#education .institution')[1].value === 'Previous College');
+    assert.deepEqual(await page.locator('#work .title').evaluateAll(inputs => inputs.map(input => input.value)),
+      ['Newest role','Previous role']);
+    assert.deepEqual(await page.locator('#work .from').evaluateAll(inputs => inputs.map(input => input.value)),
+      ['11/2024','03/2023']);
+    assert.deepEqual(await page.locator('#work .to').evaluateAll(inputs => inputs.map(input => input.value)),
+      ['10/2026','11/2024']);
+    assert.deepEqual(await page.locator('#education .institution').evaluateAll(inputs => inputs.map(input => input.value)),
+      ['Newest University','Previous College']);
+  } finally {await browser.close();}
+});
 test('profile editor saves unchanged history as dynamic defaults, not frozen overrides', async () => {
   const {browser,page} = await browserPage(fs.readFileSync(asset('autofill-profile.html'),'utf8').replace('<script src="autofill-profile.js"></script>',''),'https://local.invalid/profile');
   try {
     await page.evaluate(()=>{testData.profile={...testData.defaults};});
     await page.addScriptTag({path:asset('autofill-profile.js')});
     await page.waitForSelector('#education input');
+    assert.deepEqual(await page.evaluate(() => [lastProfileRequest.url, lastProfileRequest.headers['X-Job-Assistant-Extension']]),
+      ['http://127.0.0.1:8767/api/autofill-profile', 'test']);
     await page.locator('[type="submit"]').click();
     await page.waitForFunction(()=>!!window.saved);
     assert.equal(await page.evaluate(()=>Object.keys(saved.overrides).length),0);
     await page.locator('[data-key="first_name"]').fill('Alex');
     await page.locator('[type="submit"]').click();
     await page.waitForFunction(()=>saved.overrides.first_name==='Alex');
+    assert.equal(await page.evaluate(()=>saved.base_storage_revision),'storage-one');
   } finally {await browser.close();}
 });
-test('profile editor shows manual fields immediately while the local assistant is still connecting', async () => {
+test('profile editor blocks saving during load and reveals saved values only after success', async () => {
   const {browser,page} = await browserPage(fs.readFileSync(asset('autofill-profile.html'),'utf8').replace('<script src="autofill-profile.js"></script>',''),'https://local.invalid/profile');
   try {
-    await page.evaluate(()=>{chrome.runtime.sendMessage=()=>new Promise(()=>{});});
+    await page.evaluate(()=>{
+      testData.overrides={prefix:'Mr.'}; testData.profile={...testData.profile,prefix:'Mr.'};
+      window.fetch=()=>new Promise(resolve=>window.finishLoading=()=>resolve({ok:true,json:async()=>testData}));
+    });
     await page.addScriptTag({path:asset('autofill-profile.js')});
-    await page.waitForSelector('#contact-fields [data-key="first_name"]');
-    assert.equal(await page.locator('#source').textContent(),'No source resume found.');
+    assert.equal(await page.locator('#autofill-form').isHidden(),true);
+    assert.equal(await page.locator('#save-profile').isDisabled(),true);
     assert.equal(await page.locator('#status').textContent(),'Connecting to the local assistant…');
+    await page.evaluate(()=>document.querySelector('#autofill-form').dispatchEvent(new Event('submit',{cancelable:true})));
+    assert.equal(await page.locator('#status').textContent(),'Wait for your saved answers to load before saving.');
+    await page.evaluate(()=>window.finishLoading());
+    await page.waitForFunction(()=>document.querySelector('[data-key="prefix"]')?.value==='Mr.');
+    assert.equal(await page.locator('#autofill-form').isVisible(),true);
+    assert.equal(await page.locator('#save-profile').isEnabled(),true);
+    assert.equal(await page.locator('#contact-fields').getByText('Your saved value').count(),1);
+  } finally {await browser.close();}
+});
+test('profile editor keeps the form closed when loading fails', async () => {
+  const {browser,page} = await browserPage(fs.readFileSync(asset('autofill-profile.html'),'utf8').replace('<script src="autofill-profile.js"></script>',''),'https://local.invalid/profile');
+  try {
+    await page.evaluate(()=>{window.fetch=async()=>({ok:false,json:async()=>({ok:false,error:'Local assistant is unavailable.'})});});
+    await page.addScriptTag({path:asset('autofill-profile.js')});
+    await page.waitForFunction(()=>!document.querySelector('#retry-load').hidden);
+    assert.equal(await page.locator('#autofill-form').isHidden(),true);
+    assert.equal(await page.locator('#save-profile').isDisabled(),true);
+    assert.match(await page.locator('#load-status').textContent(),/Do not re-enter or save details/);
   } finally {await browser.close();}
 });
 test('dashboard refresh adds rows outside editors, defers inside editors, and preserves unsaved notes', async () => {

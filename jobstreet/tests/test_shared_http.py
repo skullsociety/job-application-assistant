@@ -55,7 +55,8 @@ class SharedHttpTests(unittest.TestCase):
                     self.assertEqual(response.status, status)
                     response.read()
                 saved = store.get(job.id)
-                with patch('companion.server.allowed_extension', side_effect=lambda origin: origin in {'chrome-extension://linkedin', 'chrome-extension://jobstreet', 'chrome-extension://careersgov'}), patch('companion.server.get_profile', return_value={'profile': {'first_name': 'Example'}}), patch('companion.server.save_profile', return_value={'profile': {'first_name': 'Edited'}}):
+                allowed = {'chrome-extension://linkedin', 'chrome-extension://jobstreet', 'chrome-extension://careersgov'}
+                with patch('companion.server.allowed_extension', side_effect=lambda origin: origin in allowed), patch('companion.server.allowed_extension_request', side_effect=lambda origin, extension_id: origin in allowed or (not origin and extension_id == 'a' * 32)), patch('companion.server.get_profile', return_value={'profile': {'first_name': 'Example'}}), patch('companion.server.save_profile', return_value={'profile': {'first_name': 'Edited'}}):
                     for origin in ('chrome-extension://linkedin', 'chrome-extension://jobstreet', 'chrome-extension://careersgov', 'https://evil.invalid', ''):
                         for method in ('GET', 'POST'):
                             connection.request(method, '/api/autofill-profile', '{}' if method == 'POST' else None, {'Origin': origin, 'Content-Type': 'application/json'})
@@ -66,6 +67,14 @@ class SharedHttpTests(unittest.TestCase):
                                 self.assertEqual(response.getheader('Access-Control-Allow-Origin'), origin)
                             else:
                                 self.assertNotIn('profile', body)
+                    connection.request('GET', '/api/autofill-profile', headers={'X-Job-Assistant-Extension': 'a' * 32})
+                    response = connection.getresponse()
+                    self.assertEqual(response.status, 200)
+                    response.read()
+                    connection.request('POST', '/api/autofill-profile', '{}', {'X-Job-Assistant-Extension': 'a' * 32, 'Content-Type': 'application/json'})
+                    response = connection.getresponse()
+                    self.assertEqual(response.status, 200)
+                    response.read()
                 self.assertEqual(saved.closing_date, '2026-12-31')
                 self.assertTrue(saved.applied)
                 self.assertEqual(saved.notes, 'My note')
