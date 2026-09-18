@@ -9,6 +9,7 @@ const crypto = require("node:crypto");
 const { spawn, spawnSync } = require("node:child_process");
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
+const SUITE_EXTENSION = path.resolve(PACKAGE_ROOT, "..", "extension");
 const DASHBOARD_URL = "http://127.0.0.1:8766/";
 const TASK_NAME = "LinkedIn Job Application Assistant";
 const NATIVE_HOST_NAME = "com.linkedin_job_assistant.launcher";
@@ -92,19 +93,19 @@ function ensureRuntimeFolders() {
 }
 
 function extensionLocation() {
-  return isPackagedInstall() ? path.join(runtimeRoot(), "extension") : path.join(PACKAGE_ROOT, "extension");
+  return isPackagedInstall() ? path.join(runtimeRoot(), "extension") : SUITE_EXTENSION;
 }
 
 function copyExtensionForPackagedInstall() {
   const destination = extensionLocation();
   if (!isPackagedInstall()) return destination;
   fs.mkdirSync(destination, { recursive: true });
-  fs.cpSync(path.join(PACKAGE_ROOT, "extension"), destination, { recursive: true, force: true });
+  fs.cpSync(SUITE_EXTENSION, destination, { recursive: true, force: true });
   return destination;
 }
 
 function extensionIdentity() {
-  const manifest = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, "extension", "manifest.json"), "utf8"));
+  const manifest = JSON.parse(fs.readFileSync(path.join(SUITE_EXTENSION, "manifest.json"), "utf8"));
   if (typeof manifest.key !== "string" || !/^[A-Za-z0-9+/=]+$/.test(manifest.key)) {
     throw new Error("The Chrome extension does not have a valid stable public key.");
   }
@@ -384,5 +385,4 @@ main().catch((error) => {
   console.error(`Error: ${error.message}`);
   process.exitCode = 1;
 });
-
 

@@ -63,8 +63,8 @@ test("native messages cannot request arbitrary commands", () => {
   assert.throws(() => safeBatchPath('C:\\bad%name'));
 });
 
-test("each extension leases the helper and releases it after its last browser window", async () => {
-  for (const project of ["linkedin", "jobstreet", "careersgov"]) {
+test("the unified extension leases the helper and releases it after the last browser window", async () => {
+  for (const project of ["extension"]) {
     let windowCount = 1, connected = 0, disconnected = 0;
     const event = () => { const listeners = []; return {addListener: fn => listeners.push(fn), fire: (...args) => listeners.forEach(fn => fn(...args))}; };
     const onRemoved = event(), onCreated = event();
@@ -77,7 +77,7 @@ test("each extension leases the helper and releases it after its last browser wi
         return port;
       }}};
     const context = {chrome, setTimeout, clearTimeout, console};
-    vm.runInNewContext(fs.readFileSync(path.join(ROOT, project, "extension/native-lifecycle.js"), "utf8"), context);
+    vm.runInNewContext(fs.readFileSync(path.join(ROOT, project, "native-lifecycle.js"), "utf8"), context);
     await delay(10); assert.equal(connected, 1);
     windowCount = 1; onRemoved.fire(1); await delay(10); assert.equal(disconnected, 0);
     windowCount = 0; onRemoved.fire(2); await delay(10); assert.equal(disconnected, 1);
@@ -86,15 +86,12 @@ test("each extension leases the helper and releases it after its last browser wi
   }
 });
 
-test("extensions agree on the dashboard address and source-specific capture ports", () => {
-  for (const [project, port] of [["careersgov", 8765], ["linkedin", 8766], ["jobstreet", 8767]]) {
-    const script = fs.readFileSync(path.join(ROOT, project, "extension/service-worker.js"), "utf8");
-    assert.match(script, new RegExp(`COMPANION_BASE = "http://127.0.0.1:${port}"`));
-    assert.match(script, /(?:target|dashboardUrl) = "http:\/\/127.0.0.1:8767\/"/);
-    const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, project, "extension/manifest.json"), "utf8"));
-    assert.ok(manifest.permissions.includes("nativeMessaging"));
-    assert.ok(manifest.host_permissions.includes("http://127.0.0.1:8767/*"));
-    assert.match(manifest.key, /^[A-Za-z0-9+/]+=*$/);
-    assert.match(stableId(project), /^[a-p]{32}$/);
-  }
+test("one extension connects all source-specific capture ports to the shared dashboard", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "extension/manifest.json"), "utf8"));
+  const workers = ["careersgov", "linkedin", "jobstreet"].map(site => fs.readFileSync(path.join(ROOT, "extension/sites", site, "worker.js"), "utf8"));
+  for (const port of [8765, 8766, 8767]) assert.ok(workers.some(script => script.includes(`COMPANION_BASE = "http://127.0.0.1:${port}"`)));
+  assert.ok(manifest.permissions.includes("nativeMessaging"));
+  assert.ok(manifest.host_permissions.includes("http://127.0.0.1:8767/*"));
+  assert.match(manifest.key, /^[A-Za-z0-9+/]+=*$/);
+  assert.match(stableId(), /^[a-p]{32}$/);
 });

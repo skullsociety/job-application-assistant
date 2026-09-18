@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "JobStreet Job Application Assistant",
-  "version": "1.5.3",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy1h/hbrW2TsRV+Xx8b8xPEedb/ViDivRYN4EdUQ76AoT7vkNPyrb+PtkYq/MXa4eTTBjemXS4cGG4WTEWbVp3N9rnN7cfIMFebgSuDRTjfH2BUKULGweVlgU/ASvy5p5kag0nkglpnWn/oUcGkwCUvBz25ADiu61KC0gq0f5exbf5r9bR5FO12LNe/tuhKofaZ5r1o2QBGHD9oes5x6ryxwHcTWW/HbLoGhf+7ItAaQG8OtZh/4ELi9j9cGN4GGdtikFtetJYvyeGfNEyGKZKUbHXF0t/tUTjo5KuQTUldsb9uSR6mG2HmzpbGF7SUKAtFpL4vQ+HNWRV3rjVu/DPQIDAQAB",
-  "description": "Capture the current visible JobStreet listing locally and match it against the shared job tracker.",
+  "name": "Unified Job Application Assistant",
+  "version": "3.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA32jAaby3RCx/DSPOBbEM7wo5VXOHvdJXZGmI1VqpX7L+f9V1GP6l7/5vSaGKOFDQDCc3csvUCnB9we2T3zjMD8BrIyfNIzYqY01RmS88fRfSgTPShAvok4RoyxCQZVJFVJBxz6ArYgrVh7oVU9L2i4Ilm/2ol1HjebTRBneV39ZPSCzoJ5gcbGK8ylKpyCWhVV1jBCsRbDLwwQkQbwWobphIOtLJLADuoAybSA5IvpG3WEBDApZ28rUSaOtzxAE4dXcGIM2BPwKCDKLhcdzTTEwFLl2PJgZ848Famc+vLkb8sXdIZ43TvVezofcTYPTuBWew+m0P6ArD5aFlZN2lwwIDAQAB",
+  "description": "Capture LinkedIn, JobStreet and Careers@Gov jobs, then track and autofill applications locally.",
   "permissions": [
     "activeTab",
     "nativeMessaging",
@@ -13,11 +13,14 @@
     "tabs"
   ],
   "host_permissions": [
+    "https://www.linkedin.com/*",
+    "https://linkedin.com/*",
     "https://jobstreet.com/*",
     "https://*.jobstreet.com/*",
     "https://jobstreet.com.sg/*",
     "https://*.jobstreet.com.sg/*",
-    "http://127.0.0.1:8767/*",
+    "https://jobs.careers.gov.sg/*",
+    "https://*.myworkdayjobs.com/*",
     "https://*.successfactors.com/*",
     "https://*.successfactors.eu/*",
     "https://*.sapsf.com/*",
@@ -25,26 +28,29 @@
     "https://*.sapsf.cn/*",
     "https://*.hr.cloud.sap/*",
     "https://*.jobs.hr.cloud.sap.com/*",
-    "https://*.myworkdayjobs.com/*"
+    "http://127.0.0.1:8765/*",
+    "http://127.0.0.1:8766/*",
+    "http://127.0.0.1:8767/*"
   ],
   "background": {
     "service_worker": "service-worker.js"
   },
   "action": {
-    "default_title": "Open JobStreet Job Application Assistant"
+    "default_title": "Open Unified Job Application Assistant"
   },
+  "options_page": "autofill-profile.html",
   "commands": {
     "capture-current-job": {
       "suggested_key": {
         "windows": "Ctrl+Q"
       },
-      "description": "Capture the current visible JobStreet job"
+      "description": "Capture the current supported job listing"
     },
     "open-local-dashboard": {
       "suggested_key": {
         "windows": "Ctrl+M"
       },
-      "description": "Open the shared job dashboard"
+      "description": "Open the unified local job dashboard"
     }
   },
   "side_panel": {
@@ -52,15 +58,23 @@
   },
   "content_scripts": [
     {
+      "matches": ["https://www.linkedin.com/*", "https://linkedin.com/*"],
+      "js": ["sites/linkedin/content.js"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": [
         "https://jobstreet.com/*",
         "https://*.jobstreet.com/*",
         "https://jobstreet.com.sg/*",
         "https://*.jobstreet.com.sg/*"
       ],
-      "js": [
-        "content.js"
-      ],
+      "js": ["sites/jobstreet/content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://jobs.careers.gov.sg/*"],
+      "js": ["sites/careersgov/capture-core.js", "sites/careersgov/content.js"],
       "run_at": "document_idle"
     },
     {
@@ -74,13 +88,9 @@
         "https://*.jobs.hr.cloud.sap.com/*",
         "https://*.myworkdayjobs.com/*"
       ],
-      "js": [
-        "successfactors-core.js",
-        "successfactors-autofill.js"
-      ],
+      "js": ["successfactors-core.js", "successfactors-autofill.js"],
       "all_frames": true,
       "run_at": "document_idle"
     }
-  ],
-  "options_page": "autofill-profile.html"
+  ]
 }

@@ -1,6 +1,6 @@
 {
   "name": "job-application-assistant-suite",
-  "version": "2.0.2",
+  "version": "3.0.0",
   "private": true,
   "license": "MIT",
   "type": "commonjs",
@@ -8,9 +8,10 @@
     "sync": "node chrome-helper/sync-extension-assets.js",
     "test:helper": "node --test chrome-helper/helper.test.js",
     "test:shared": "node --test shared_tracker/autofill.test.js shared_tracker/browser.test.js",
+    "test:extension": "node --check extension/service-worker.js && node --check extension/sidepanel.js && node --check extension/sites/linkedin/worker.js && node --check extension/sites/jobstreet/worker.js && node --check extension/sites/careersgov/worker.js && node --test extension/unified.test.cjs extension/sites/careersgov/capture.test.cjs",
     "test:linkedin": "npm --prefix linkedin run test:js",
     "test:jobstreet": "npm --prefix jobstreet run test:js",
-    "test": "npm run sync && npm run test:helper && npm run test:shared && npm run test:linkedin && npm run test:jobstreet"
+    "test": "npm run sync && npm run test:helper && npm run test:shared && npm run test:extension && npm run test:linkedin && npm run test:jobstreet"
   },
   "engines": {
     "node": ">=18"

@@ -30,7 +30,8 @@ importScripts('successfactors-core.js');
     const isEditor = editor(sender);
     let isForm = false;
     try { isForm = SuccessFactorsCore.supported(new URL(sender.url || sender.tab?.url).hostname); } catch {}
-    const isPanel = sender.url === chrome.runtime.getURL('sidepanel.html');
+    const isPanel = sender.url === chrome.runtime.getURL('sidepanel.html')
+      || /^sites\/(linkedin|jobstreet|careersgov)\/sidepanel\.html$/.test(String(sender.url || '').replace(chrome.runtime.getURL(''), ''));
     if (!isEditor && !isForm && !isPanel) { respond({ok: false, error: 'Use a supported Workday/SuccessFactors form or the extension profile.'}); return false; }
     if (message.type === 'SAVE_SF_PROFILE' && !isEditor) { respond({ok: false, error: 'Only the profile editor can change defaults.'}); return false; }
     if (message.type === 'OPEN_SF_PROFILE') {

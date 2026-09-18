@@ -1,6 +1,5 @@
-importScripts("native-lifecycle.js");
-importScripts("successfactors-worker.js");
 "use strict";
+(() => {
 
 const COMPANION_BASE = "http://127.0.0.1:8767";
 const NATIVE_HOST_NAME = "com.job_application_assistant.launcher";
@@ -123,7 +122,7 @@ async function captureCurrentJob(tab) {
   try {
     extraction = await chrome.tabs.sendMessage(tab.id, { type: "EXTRACT_JOBSTREET_JOB" });
   } catch (_error) {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["sites/jobstreet/content.js"] });
     extraction = await chrome.tabs.sendMessage(tab.id, { type: "EXTRACT_JOBSTREET_JOB" });
   }
   if (!extraction?.ok) throw new Error(extraction?.error || "The visible JobStreet job could not be extracted.");
@@ -205,11 +204,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
-chrome.commands.onCommand.addListener(async (command, tab) => {
-  try {
-    if (command === "capture-current-job") await captureCurrentJob(tab);
-    if (command === "open-local-dashboard") await openDashboard();
-  } catch (error) {
-    await showStatus(tab?.id, error.message, "error");
-  }
-});
+globalThis.JobStreetSite = { captureCurrentJob, openDashboard, showStatus, matches: (url) => isJobStreetJob(url) };
+})();

@@ -5,11 +5,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = path.resolve(__dirname, "../..");
+const siteRoot = path.join(projectRoot, "extension", "sites", "jobstreet");
 
 test("side panel element bindings match its HTML", () => {
-  const script = fs.readFileSync(path.join(projectRoot, "extension", "sidepanel.js"), "utf8");
-  const document = fs.readFileSync(path.join(projectRoot, "extension", "sidepanel.html"), "utf8");
+  const script = fs.readFileSync(path.join(siteRoot, "sidepanel.js"), "utf8");
+  const document = fs.readFileSync(path.join(siteRoot, "sidepanel.html"), "utf8");
   const declarations = [...script.matchAll(/(\w+):\s*document\.querySelector\("#([^"\s]+)"\)/g)];
   const declaredNames = new Set(declarations.map((match) => match[1]));
   const referencedNames = new Set([...script.matchAll(/elements\.(\w+)/g)].map((match) => match[1]));
@@ -24,18 +25,18 @@ test("extension access is limited to JobStreet, supported SuccessFactors pages a
   assert.ok(manifest.permissions.includes("scripting"));
   assert.ok(manifest.permissions.includes("activeTab"));
   assert.ok(manifest.permissions.includes("storage"));
-  assert.equal(manifest.content_scripts.length, 2);
-  assert.deepEqual(manifest.content_scripts[1].js, ['successfactors-core.js', 'successfactors-autofill.js']);
-  assert.deepEqual(manifest.content_scripts[0].js, ["content.js"]);
-  assert.ok(manifest.content_scripts[0].matches.every((permission) => permission.startsWith("https://") && permission.includes("jobstreet.com")));
+  assert.equal(manifest.content_scripts.length, 4);
+  assert.deepEqual(manifest.content_scripts[3].js, ['successfactors-core.js', 'successfactors-autofill.js']);
+  assert.deepEqual(manifest.content_scripts[1].js, ["sites/jobstreet/content.js"]);
+  assert.ok(manifest.content_scripts[1].matches.every((permission) => permission.startsWith("https://") && permission.includes("jobstreet.com")));
   assert.ok(manifest.host_permissions.some((permission) => permission === "http://127.0.0.1:8767/*"));
   assert.ok(manifest.host_permissions.some((permission) => permission.includes("jobstreet.com")));
   assert.ok(!manifest.host_permissions.includes("<all_urls>"));
-  assert.equal(fs.existsSync(path.join(projectRoot, "extension", "content.js")), true);
+  assert.equal(fs.existsSync(path.join(siteRoot, "content.js")), true);
 });
 
 test("content script extracts one visible JobStreet detail page and never operates application forms", () => {
-  const script = fs.readFileSync(path.join(projectRoot, "extension", "content.js"), "utf8");
+  const script = fs.readFileSync(path.join(siteRoot, "content.js"), "utf8");
   for (const expected of [
     "job-detail-title",
     "advertiser-name",
@@ -57,7 +58,7 @@ test("content script extracts one visible JobStreet detail page and never operat
 });
 
 test("side panel auto-populates editable JobStreet fields and displays LinkedIn matches", () => {
-  const script = fs.readFileSync(path.join(projectRoot, "extension", "sidepanel.js"), "utf8");
+  const script = fs.readFileSync(path.join(siteRoot, "sidepanel.js"), "utf8");
   assert.match(script, /EXTRACT_JOBSTREET_JOB/);
   assert.match(script, /SAVE_JOBSTREET_JOB/);
   assert.match(script, /SAVE_JOBSTREET_SETTINGS/);
@@ -69,7 +70,7 @@ test("side panel auto-populates editable JobStreet fields and displays LinkedIn 
 });
 
 test("automatic capture defaults on, remains switchable, and uses the normal database save path", () => {
-  const worker = fs.readFileSync(path.join(projectRoot, "extension", "service-worker.js"), "utf8");
+  const worker = fs.readFileSync(path.join(siteRoot, "worker.js"), "utf8");
   assert.match(worker, /jobstreetAutoCapture/);
   assert.match(worker, /\[AUTO_CAPTURE_KEY\]: true/);
   assert.match(worker, /AUTO_CAPTURE_JOBSTREET_JOB/);
@@ -79,9 +80,9 @@ test("automatic capture defaults on, remains switchable, and uses the normal dat
 });
 
 test("split search/detail pages use the selected jobId and selected-card metadata", () => {
-  const content = fs.readFileSync(path.join(projectRoot, "extension", "content.js"), "utf8");
-  const worker = fs.readFileSync(path.join(projectRoot, "extension", "service-worker.js"), "utf8");
-  const panel = fs.readFileSync(path.join(projectRoot, "extension", "sidepanel.js"), "utf8");
+  const content = fs.readFileSync(path.join(siteRoot, "content.js"), "utf8");
+  const worker = fs.readFileSync(path.join(siteRoot, "worker.js"), "utf8");
+  const panel = fs.readFileSync(path.join(siteRoot, "sidepanel.js"), "utf8");
   assert.match(content, /searchParams\.get\("jobId"\)/);
   assert.match(content, /article\[data-job-id=/);
   assert.match(content, /aria-selected/);

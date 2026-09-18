@@ -1,6 +1,6 @@
 {
   "name": "jobstreet-job-application-assistant",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "A private Chrome side panel and local companion for automatically capturing the current JobStreet listing without automatic submission.",
   "license": "MIT",
   "type": "commonjs",
@@ -10,7 +10,6 @@
   "files": [
     "bin/",
     "companion/",
-    "extension/",
     "job_assistant/",
     ".env.example",
     "config.example.toml",
@@ -27,7 +26,7 @@
     "chrome:install": "node bin/jobstreet-job-assistant.js install-chrome-host",
     "chrome:remove": "node bin/jobstreet-job-assistant.js remove-chrome-host",
     "chrome:id": "node bin/jobstreet-job-assistant.js chrome-extension-id",
-    "test:js": "node --check extension/content.js && node --check extension/service-worker.js && node --check extension/sidepanel.js && node --check bin/jobstreet-job-assistant.js && node --check bin/native-messaging-host.js && node --test tests/native_host.test.js tests/extension.test.js",
+    "test:js": "node --check ../extension/sites/jobstreet/content.js && node --check ../extension/sites/jobstreet/worker.js && node --check ../extension/sites/jobstreet/sidepanel.js && node --check bin/jobstreet-job-assistant.js && node --check bin/native-messaging-host.js && node --test tests/native_host.test.js tests/extension.test.js",
     "test:py": "python -m unittest discover -s tests",
     "test": "npm run test:js && npm run test:py",
     "prepack": "npm run test:js"

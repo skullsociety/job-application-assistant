@@ -54,7 +54,7 @@ async function refreshPreview(force = false) {
     let response;
     try { response = await chrome.tabs.sendMessage(tab.id, {type: "EXTRACT_JOB"}); }
     catch (_) {
-      await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ["capture-core.js", "content.js"]});
+      await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ["sites/careersgov/capture-core.js", "sites/careersgov/content.js"]});
       response = await chrome.tabs.sendMessage(tab.id, {type: "EXTRACT_JOB"});
     }
     if (!response?.ok) throw new Error(response?.error || "The listing is not ready.");

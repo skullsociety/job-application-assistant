@@ -44,7 +44,7 @@ from job_assistant.urls import canonicalize_job_url, is_jobstreet_hostname
 HOST = "127.0.0.1"
 PORT = 8767
 MAX_REQUEST_BYTES = 1_000_000
-CHROME_EXTENSION_ORIGIN = "chrome-extension://cjchdplhlpgilipphlfomiimaiffipil"
+CHROME_EXTENSION_ORIGIN = "chrome-extension://kbgmahagnbefnlfjghabpfagaknmbfjd"
 VERIFICATION_MARKERS = (
     "security verification",
     "verify your identity",

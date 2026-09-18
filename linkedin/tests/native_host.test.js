@@ -8,10 +8,11 @@ const test = require("node:test");
 const { spawnSync } = require("node:child_process");
 
 const projectRoot = path.resolve(__dirname, "..");
+const suiteRoot = path.resolve(projectRoot, "..");
 
 test("manifest declares a stable native-messaging extension identity", () => {
-  const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, "extension", "manifest.json"), "utf8"));
-  const packageMetadata = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8"));
+  const manifest = JSON.parse(fs.readFileSync(path.join(suiteRoot, "extension", "manifest.json"), "utf8"));
+  const packageMetadata = JSON.parse(fs.readFileSync(path.join(suiteRoot, "package.json"), "utf8"));
   assert.equal(manifest.version, packageMetadata.version);
   assert.ok(manifest.permissions.includes("nativeMessaging"));
   assert.match(manifest.key, /^[A-Za-z0-9+/=]+$/);
@@ -22,7 +23,7 @@ test("manifest declares a stable native-messaging extension identity", () => {
   const cli = spawnSync(process.execPath, [path.join(projectRoot, "bin", "linkedin-job-assistant.js"), "chrome-extension-id"], { encoding: "utf8" });
   assert.equal(cli.status, 0);
   assert.equal(cli.stdout.trim(), expectedId);
-  assert.match(fs.readFileSync(path.join(projectRoot, "extension", "service-worker.js"), "utf8"), /com\.job_application_assistant\.launcher/);
+  assert.match(fs.readFileSync(path.join(suiteRoot, "extension", "service-worker.js"), "utf8"), /native-lifecycle\.js/);
   assert.match(companion, new RegExp(`CHROME_EXTENSION_ORIGIN = "chrome-extension://${expectedId}"`));
 });
 

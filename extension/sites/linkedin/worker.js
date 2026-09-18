@@ -1,5 +1,5 @@
-importScripts("native-lifecycle.js");
-importScripts("successfactors-worker.js");
+"use strict";
+(() => {
 const COMPANION_BASE = "http://127.0.0.1:8766";
 const NATIVE_HOST_NAME = "com.job_application_assistant.launcher";
 const PROFILE_KEY = "linkedinAssistantProfile";
@@ -121,7 +121,7 @@ async function captureCurrentJob(tab) {
   try {
     extraction = await chrome.tabs.sendMessage(tab.id, { type: "EXTRACT_LINKEDIN_JOB" });
   } catch (_error) {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["sites/linkedin/content.js"] });
     extraction = await chrome.tabs.sendMessage(tab.id, { type: "EXTRACT_LINKEDIN_JOB" });
   }
   if (!extraction?.ok) throw new Error(extraction?.error || "The visible job could not be extracted.");
@@ -218,11 +218,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
-chrome.commands.onCommand.addListener(async (command, tab) => {
-  try {
-    if (command === "capture-current-job") await captureCurrentJob(tab);
-    if (command === "open-local-dashboard") await openDashboard();
-  } catch (error) {
-    await showStatus(tab?.id, error.message, "error");
-  }
-});
+globalThis.LinkedInSite = { captureCurrentJob, openDashboard, showStatus, matches: (url) => isLinkedInJob(url) };
+})();

@@ -1,14 +1,15 @@
 # Job Application Assistant Suite
 
-One local, review-first job tracker for LinkedIn, JobStreet and Careers@Gov. Each website keeps its own Chrome extension and capture logic, while the database, dashboard, Excel export, resume source, application autofill profile and Chrome lifecycle helper are shared.
+One local, review-first Chrome extension and job tracker for LinkedIn, JobStreet and Careers@Gov. Website capture logic stays isolated in small site adapters, while the database, dashboard, Excel export, resume source, application autofill profile and Chrome lifecycle helper are shared.
 
 ## Folder layout
 
 ```text
 job-assistant-suite/
-├── linkedin/                 LinkedIn extension and adapter
-├── jobstreet/                JobStreet extension and dashboard adapter
-├── careersgov/               Careers@Gov extension and adapter
+├── extension/                One Chrome extension with three site modules
+├── linkedin/                 LinkedIn local service and matching adapter
+├── jobstreet/                JobStreet local service and dashboard adapter
+├── careersgov/               Careers@Gov local service and matching adapter
 ├── shared_tracker/           Shared database schema, dashboard and autofill source
 ├── chrome-helper/            Shared Chrome startup/shutdown helper
 ├── local-data/               Private local data; never committed
@@ -30,23 +31,20 @@ The three local adapters use ports 8765–8767, but they all use one database an
 
 1. Install current versions of Python, Node.js and Google Chrome.
 2. Double-click **Setup Job Assistant Suite.bat**. It creates one private Python environment, installs the shared dependencies, packages common extension files and registers the local Chrome helper for the current Windows user.
-3. Open `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked** for each folder:
-   - `linkedin/extension`
-   - `jobstreet/extension`
-   - `careersgov/extension`
-4. Reload each extension once. Refresh any job/application tabs already open.
+3. Open `chrome://extensions`, enable **Developer mode**, and remove the three older job-assistant extensions. Your database, resumes and autofill profile are stored outside Chrome and are not deleted.
+4. Choose **Load unpacked** once and select `extension/`. Refresh any job/application tabs already open.
 
-The extensions have stable IDs, so setup no longer reads Chrome profile preferences to discover an ID. If the suite is moved, run the setup batch file again so Windows records the new helper path.
+The unified extension has a stable ID, so setup no longer reads Chrome profile preferences to discover it. If the suite is moved, run the setup batch file again so Windows records the new helper path.
 
-Opening Chrome starts the local adapters quietly. Closing the final Chrome window releases the extension connections; approximately five seconds later, the helper stops only the assistant processes it started. Chrome cannot directly execute a batch file, so this uses Chrome native messaging with a fixed `start` request and no arbitrary command execution.
+Opening Chrome starts the local adapters quietly. Closing the final Chrome window releases the extension connection; approximately five seconds later, the helper stops only the assistant processes it started. Chrome cannot directly execute a batch file, so this uses Chrome native messaging with a fixed `start` request and no arbitrary command execution.
 
 ## Everyday use
 
-Capture jobs with each site’s extension. All captures appear on the shared dashboard and the page updates without a manual refresh. Sorting, applied status, follow-up dates, notes, deletion, resume matching, tailored PDFs and Excel export remain available.
+The side panel detects the active website and displays its matching capture interface. Ctrl+Q captures the current supported listing and Ctrl+M opens the dashboard. All captures appear on the shared dashboard without a manual refresh. Sorting, applied status, follow-up dates, notes, deletion, resume matching, tailored PDFs and Excel export remain available.
 
 Only the follow-up date is displayed. Entering a date stores **Followed Up = Yes**; clearing it stores **No**. The derived field remains in the database and Excel export.
 
-Put a new text-readable PDF or DOCX resume in `local-data/resumes/`. The newest resume supplies skills, education and employment only. Open **Workday / SuccessFactors autofill defaults** from any extension, enter contact and application details manually, and review the extracted resume history. Saved values remain private and are shared by all three extensions on this computer.
+Put a new text-readable PDF or DOCX resume in `local-data/resumes/`. The newest resume supplies skills, education and employment only. Open **Autofill profile** from the extension, enter contact and application details manually, and review the extracted resume history. Saved values remain private on this computer.
 
 The autofill preserves existing answers and never submits an application. Passwords, verification, declarations, file uploads, Save/Continue and final submission stay manual. Review every generated answer before using it.
 
@@ -60,7 +58,7 @@ The existing Git history and remote were preserved from the LinkedIn project. Th
 
 ## Development and testing
 
-Shared extension files live in `shared_tracker/extension/`. Run `node chrome-helper/sync-extension-assets.js` after editing them; setup runs this automatically. Generated copies must remain inside all three unpacked extension folders for Chrome, but Git tracks only the shared source.
+Site-specific browser modules live in `extension/sites/`. Shared autofill source lives in `shared_tracker/extension/`; run `node chrome-helper/sync-extension-assets.js` after editing it. Setup runs this automatically and writes the generated copies into the unified `extension/` folder.
 
 Run `npm install` once before the JavaScript developer checks, then use `npm test`. Run Python tests with the suite environment, for example `.\.venv\Scripts\python.exe -m unittest discover -s shared_tracker`; repeat with `linkedin\tests`, `jobstreet\tests` and `careersgov\companion`.
 

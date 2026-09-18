@@ -40,6 +40,12 @@ test('fills text, real options, repeated history; skips unknown dates and existi
     await page.locator('#first').fill('Manual');
     await page.evaluate(()=>SuccessFactorsAutofill.scan());
     assert.equal(await page.locator('#first').inputValue(),'Manual');
+    // An explicit retry is allowed to correct a stale value and take the lease
+    // from another installed job-assistant extension.
+    await page.evaluate(()=>document.documentElement.setAttribute('data-job-assistant-application-owner',JSON.stringify({id:'another-extension',until:Date.now()+12000})));
+    await page.getByRole('button',{name:'Fill again'}).click();
+    await page.waitForFunction(()=>document.querySelector('#first').value==='Alex');
+    assert.match(await page.locator('[data-summary]').textContent(),/saved values reapplied/);
   } finally {await browser.close();}
 });
 test('Workday selects profile choices and commits available resume skills as chips', async () => {

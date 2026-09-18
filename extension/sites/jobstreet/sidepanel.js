@@ -70,7 +70,7 @@ async function sendToActive(messageValue) {
   try {
     return await chrome.tabs.sendMessage(tab.id, messageValue);
   } catch (_error) {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["sites/jobstreet/content.js"] });
     return chrome.tabs.sendMessage(tab.id, messageValue);
   }
 }

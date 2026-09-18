@@ -40,15 +40,13 @@ test('only supported SAP hosts and exact dropdown answers match', () => {
   assert.ok(core.optionMatch('Citizen (Singapore)', 'Singapore Citizen'));
   assert.ok(!core.optionMatch('Not Applicable (Singapore)', 'Singapore Citizen'));
 });
-test('three extension packages contain identical shared assets and wiring', () => {
-  for (const project of ['linkedin','jobstreet','careersgov']) {
-    const folder = path.join(__dirname,'..',project,'extension');
-    const manifest = JSON.parse(fs.readFileSync(path.join(folder,'manifest.json')));
-    assert.ok(manifest.content_scripts.some(item => item.js.includes('successfactors-autofill.js')));
-    assert.ok(!manifest.host_permissions.includes('<all_urls>'));
-    assert.match(fs.readFileSync(path.join(folder,'service-worker.js'),'utf8'), /importScripts\("successfactors-worker.js"\)/);
-    for (const file of fs.readdirSync(path.join(__dirname,'extension'))) {
-      assert.equal(fs.readFileSync(path.join(folder,file),'utf8'), fs.readFileSync(path.join(__dirname,'extension',file),'utf8'));
-    }
+test('unified extension contains the shared autofill assets and wiring', () => {
+  const folder = path.join(__dirname,'..','extension');
+  const manifest = JSON.parse(fs.readFileSync(path.join(folder,'manifest.json')));
+  assert.ok(manifest.content_scripts.some(item => item.js.includes('successfactors-autofill.js')));
+  assert.ok(!manifest.host_permissions.includes('<all_urls>'));
+  assert.match(fs.readFileSync(path.join(folder,'service-worker.js'),'utf8'), /"successfactors-worker.js"/);
+  for (const file of fs.readdirSync(path.join(__dirname,'extension'))) {
+    assert.equal(fs.readFileSync(path.join(folder,file),'utf8'), fs.readFileSync(path.join(__dirname,'extension',file),'utf8'));
   }
 });

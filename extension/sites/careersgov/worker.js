@@ -1,5 +1,5 @@
-importScripts("native-lifecycle.js");
-importScripts("successfactors-worker.js");
+"use strict";
+(() => {
 
 const COMPANION_BASE = "http://127.0.0.1:8765";
 const CAPTURE_COMMAND = "capture-current-job";
@@ -57,7 +57,7 @@ async function sendToJobTab(tabId, message) {
   try {
     return await chrome.tabs.sendMessage(tabId, message);
   } catch (_error) {
-    await chrome.scripting.executeScript({ target: { tabId }, files: ["capture-core.js", "content.js"] });
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["sites/careersgov/capture-core.js", "sites/careersgov/content.js"] });
     return chrome.tabs.sendMessage(tabId, message);
   }
 }
@@ -246,14 +246,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     })().then(sendResponse).catch(error => sendResponse({ok: false, error: error.message}));
     return true;
   }
-  if (message?.type === "COMPANION_HEALTH") {
-    fetch(`${COMPANION_BASE}/api/health`, { cache: "no-store" })
-      .then(async (response) => ({ ok: response.ok, body: await response.json() }))
-      .then(sendResponse)
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-
   if (message?.type === "SAVE_JOB") {
     saveJob(message.job)
       .then(sendResponse)
@@ -278,7 +270,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-chrome.commands.onCommand.addListener((command, tab) => {
-  if (command === CAPTURE_COMMAND) captureCurrentJob(tab);
-  if (command === DASHBOARD_COMMAND) openLocalDashboard();
-});
+globalThis.CareersGovSite = {
+  captureCurrentJob,
+  openDashboard: openLocalDashboard,
+  matches: (url) => String(url || "").startsWith("https://jobs.careers.gov.sg/"),
+};
+})();

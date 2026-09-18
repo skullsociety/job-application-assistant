@@ -29,10 +29,10 @@ test("side panel bindings and shared application autofill files exist", () => {
   const script = fs.readFileSync(path.join(__dirname, "sidepanel.js"), "utf8");
   const html = fs.readFileSync(path.join(__dirname, "sidepanel.html"), "utf8");
   for (const match of script.matchAll(/document\.querySelector\("#([^"]+)"\)/g)) assert.ok(html.includes('id="' + match[1] + '"'), match[1]);
-  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "manifest.json"), "utf8"));
-  assert.deepEqual(manifest.content_scripts[0].js, ["capture-core.js", "content.js"]);
-  assert.deepEqual(manifest.content_scripts[1].js, ["successfactors-core.js", "successfactors-autofill.js"]);
-  assert.ok(manifest.content_scripts[1].matches.includes("https://*.myworkdayjobs.com/*"));
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "manifest.json"), "utf8"));
+  assert.deepEqual(manifest.content_scripts[2].js, ["sites/careersgov/capture-core.js", "sites/careersgov/content.js"]);
+  assert.deepEqual(manifest.content_scripts[3].js, ["successfactors-core.js", "successfactors-autofill.js"]);
+  assert.ok(manifest.content_scripts[3].matches.includes("https://*.myworkdayjobs.com/*"));
   assert.ok(!manifest.host_permissions.includes("<all_urls>"));
 });
 function mockPage() {

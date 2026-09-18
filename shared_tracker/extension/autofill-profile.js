@@ -88,7 +88,7 @@ form.addEventListener('submit', async event => {
   try {
     const data = await chrome.runtime.sendMessage({type:'SAVE_SF_PROFILE',value:{enabled:document.querySelector('#enabled').checked,overrides,custom_answers}});
     if (!data?.ok) throw new Error(data?.error || 'Save failed.');
-    render(data); status.textContent = 'Saved. All three extensions use these defaults.';
+    render(data); status.textContent = 'Saved. The unified extension uses these defaults.';
   } catch(error) { status.textContent = error.message; }
 });
 document.querySelectorAll('[data-add]').forEach(button => button.onclick = () => { const section = button.dataset.add; renderHistory(section, [...history(section), {}]); dirty = true; });

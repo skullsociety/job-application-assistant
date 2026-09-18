@@ -13,10 +13,10 @@
   const controls = () => [...document.querySelectorAll('input,textarea,select,[role="combobox"],button[aria-haspopup="listbox"]')]
     .filter(el => visible(el) && !el.disabled && !el.readOnly && !el.closest('#job-assistant-sf-status'));
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-  function owner() {
+  function owner(force = false) {
     let current;
     try { current = JSON.parse(document.documentElement.getAttribute(OWNER) || 'null'); } catch {}
-    if (current && current.id !== mine && current.until > Date.now()) return false;
+    if (!force && current && current.id !== mine && current.until > Date.now()) return false;
     document.documentElement.setAttribute(OWNER, JSON.stringify({id: mine, until: Date.now() + 12000}));
     return true;
   }
@@ -118,21 +118,21 @@
     el.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
     return false;
   }
-  async function fill(el, value, label) {
-    if (value === null || value === undefined || value === '' || userEdited.has(el)) return false;
+  async function fill(el, value, label, force = false) {
+    if (value === null || value === undefined || value === '' || (!force && userEdited.has(el))) return false;
     if (['password','hidden','file','submit','image'].includes(el.type)) return false;
     if (el.type === 'radio') {
       const group = controls().filter(other => other.type === 'radio' && other.name === el.name);
-      if (group.some(other => other.checked)) return false;
       const radio = group.find(other => core.optionMatch(identity(other) || other.value, value));
-      if (!radio) return false;
+      if (!radio || radio.checked) return false;
+      if (!force && group.some(other => other.checked)) return false;
       radio.click(); return radio.checked;
     }
     if (el.type === 'checkbox') {
       if (typeof value !== 'boolean' || el.checked === value || !/current|work here|still employ/.test(core.norm(label))) return false;
       el.click(); return el.checked === value;
     }
-    if (!empty(el)) return false;
+    if (!force && !empty(el)) return false;
     if (el instanceof HTMLSelectElement) {
       const option = [...el.options].find(option => !option.disabled && core.optionMatch(text(option), value));
       if (!option) return false;
@@ -166,7 +166,14 @@
       const summary = document.createElement('span'); summary.dataset.summary = '';
       const title = document.createElement('strong'); title.textContent = /myworkdayjobs\.com$/i.test(location.hostname) ? 'Workday autofill' : 'SuccessFactors autofill';
       const edit = document.createElement('button'); edit.textContent = 'Edit defaults'; edit.type = 'button'; edit.onclick = () => chrome.runtime.sendMessage({type:'OPEN_SF_PROFILE'});
-      const retry = document.createElement('button'); retry.textContent = 'Fill again'; retry.type = 'button'; retry.onclick = () => { fetchedAt = 0; scan(); };
+      const retry = document.createElement('button'); retry.textContent = 'Fill again'; retry.type = 'button'; retry.onclick = async () => {
+        retry.disabled = true; retry.textContent = 'Filling…';
+        try {
+          for (let attempt = 0; running && attempt < 25; attempt++) await pause(100);
+          fetchedAt = 0;
+          await scan({force: true});
+        } finally { retry.disabled = false; retry.textContent = 'Fill again'; }
+      };
       const close = document.createElement('button'); close.textContent = '×'; close.type = 'button'; close.setAttribute('aria-label','Dismiss autofill notice'); close.onclick = () => { dismissed = true; box.remove(); };
       for (const button of [edit,retry,close]) button.style.cssText = 'margin-left:5px;font:inherit;cursor:pointer';
       box.append(title, document.createElement('br'), summary, document.createElement('br'), edit, retry, close); document.body.appendChild(box);
@@ -190,8 +197,8 @@
       }
     }
   }
-  async function scan() {
-    if (running || document.hidden || !owner() || accountScreen()) return;
+  async function scan({force = false} = {}) {
+    if (running || document.hidden || !owner(force) || accountScreen()) return;
     running = true;
     const lease = setInterval(owner, 4000);
     try {
@@ -215,11 +222,14 @@
           index = occurrence.get(key) || 0; occurrence.set(key, index + 1);
         }
         const value = core.answer(label, ctx.section, index, profile);
-        if (await fill(el, value, label)) filled++;
+        if (await fill(el, value, label, force)) filled++;
         else if (empty(el) && (el.required || el.getAttribute('aria-required') === 'true')) unresolved++;
       }
       await expandHistory(fields);
-      notice((filled ? filled + ' fields filled. ' : 'Autofill checked. ') + (unresolved ? unresolved + ' required fields need review. ' : '') + 'Review before saving or submitting.');
+      const result = force
+        ? (filled ? filled + ' saved values reapplied. ' : 'No saved values could be reapplied. ')
+        : (filled ? filled + ' fields filled. ' : 'Autofill checked. ');
+      notice(result + (unresolved ? unresolved + ' required fields need review. ' : '') + 'Review before saving or submitting.');
     } catch (error) { notice(error.message); }
     finally { clearInterval(lease); running = false; }
   }

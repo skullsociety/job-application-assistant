@@ -29,11 +29,10 @@ node "chrome-helper\install.js"
 if errorlevel 1 goto :failed
 
 echo.
-echo Setup complete. In chrome://extensions, load these three folders:
-echo   linkedin\extension
-echo   jobstreet\extension
-echo   careersgov\extension
-echo Then reload each extension once.
+echo Setup complete. In chrome://extensions:
+echo   Remove the three older job-assistant extensions. Your local data is preserved.
+echo   Choose Load unpacked and select: extension
+echo Then refresh job and application tabs already open.
 pause
 exit /b 0
 

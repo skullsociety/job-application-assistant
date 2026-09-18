@@ -23,7 +23,7 @@ async function sendToActive(message) {
   const tab = await activeTab();
   if (!isLinkedInJob(tab) && !isWorkdayApplication(tab) && !isSuccessFactorsApplication(tab)) throw new Error("Open a LinkedIn, Workday, or SuccessFactors application page in the active tab.");
   try { return await chrome.tabs.sendMessage(tab.id, message); }
-  catch (_) { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content.js"] }); return chrome.tabs.sendMessage(tab.id, message); }
+  catch (_) { await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["sites/linkedin/content.js"] }); return chrome.tabs.sendMessage(tab.id, message); }
 }
 
 async function extractPreview() {

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Unified Job Application Assistant</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div id="toolbar">
+    <strong>Job Assistant</strong>
+    <span id="current-site">Checking current tab…</span>
+    <button id="dashboard" type="button">Dashboard</button>
+    <button id="profile" type="button">Autofill profile</button>
+  </div>
+  <main id="home">
+    <h1>Unified Job Application Assistant</h1>
+    <p id="home-message">Open LinkedIn, JobStreet, Careers@Gov, Workday, or SuccessFactors.</p>
+    <div class="site-list">
+      <span>LinkedIn</span><span>JobStreet</span><span>Careers@Gov</span>
+    </div>
+    <p>Ctrl+Q captures the current supported listing. Ctrl+M opens the local dashboard.</p>
+    <p id="status" role="status"></p>
+  </main>
+  <iframe id="site-panel" title="Current job-site assistant" hidden></iframe>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

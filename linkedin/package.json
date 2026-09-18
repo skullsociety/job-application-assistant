@@ -1,6 +1,6 @@
 {
   "name": "linkedin-job-application-assistant",
-  "version": "1.5.6",
+  "version": "1.5.7",
   "description": "A private Chrome extension and local companion for capturing and tracking job listings without automatic submission.",
   "license": "MIT",
   "type": "commonjs",
@@ -10,7 +10,6 @@
   "files": [
     "bin/",
     "companion/",
-    "extension/",
     "job_assistant/",
     ".env.example",
     "config.example.toml",
@@ -30,7 +29,7 @@
     "chrome:id": "node bin/linkedin-job-assistant.js chrome-extension-id",
     "autostart:install": "node bin/linkedin-job-assistant.js install-autostart",
     "autostart:remove": "node bin/linkedin-job-assistant.js remove-autostart",
-    "test:js": "node --check extension/content.js && node --check extension/service-worker.js && node --check extension/sidepanel.js && node --check extension/profile.js && node --check bin/linkedin-job-assistant.js && node --check bin/native-messaging-host.js && node --test tests/native_host.test.js tests/extension.test.js",
+    "test:js": "node --check ../extension/sites/linkedin/content.js && node --check ../extension/sites/linkedin/worker.js && node --check ../extension/sites/linkedin/sidepanel.js && node --check ../extension/sites/linkedin/profile.js && node --check bin/linkedin-job-assistant.js && node --check bin/native-messaging-host.js && node --test tests/native_host.test.js tests/extension.test.js",
     "prepack": "npm run test:js"
   },
   "engines": {
