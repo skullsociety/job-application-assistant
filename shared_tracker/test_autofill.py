@@ -2,10 +2,12 @@ import json
 import os
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
-from shared_tracker.autofill_profile import get_profile, save_profile, validate_saved, allowed_extension, allowed_extension_request
+from shared_tracker.autofill_profile import (get_profile, save_profile, validate_saved, allowed_extension,
+                                             allowed_extension_request, working_experience_years)
 from shared_tracker.resume_profile import parse_resume, newest_resume, partial_date
 
 SAMPLE = '''Alex Example
@@ -90,6 +92,19 @@ class AutofillTests(unittest.TestCase):
             self.assertEqual(profile['profile']['expected_salary'], '')
             self.assertEqual(profile['profile']['first_name'], '')
 
+    def test_working_experience_excludes_non_full_time_and_overlaps(self):
+        entries = [
+            {'job_title': 'Analyst', 'start_date': '2020-01', 'end_date': '2020-06'},
+            {'job_title': 'Engineer', 'start_date': '2020-05', 'end_date': '2020-12'},
+            {'job_title': 'Data Intern', 'start_date': '2021-01', 'end_date': '2021-12'},
+            {'job_title': 'Part-time Assistant', 'start_date': '2019-01', 'end_date': '2019-12'},
+        ]
+        self.assertEqual(working_experience_years(entries, date(2026, 9, 19)), '1')
+        self.assertEqual(working_experience_years(entries[:1], date(2026, 9, 19)), '0.5')
+        self.assertEqual(working_experience_years([
+            {'job_title': 'Current role', 'start_date': '2026-07', 'end_date': '2027-12', 'current': True},
+        ], date(2026, 9, 19)), '0.3')
+
     def test_missing_or_unreadable_resume_does_not_use_stale_defaults(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -109,7 +124,8 @@ class AutofillTests(unittest.TestCase):
             self.assertIsNone(newest_resume([root]))
         for invalid in ({'overrides': {'password': 'x'}}, {'enabled': 'yes'}, {'overrides': {'employment': [{'current': 'yes'}]}},
                         {'overrides': {'prefix': 'Captain'}}, {'overrides': {'phone_device_type': 'Fax'}},
-                        {'overrides': {'earliest_available_start_date': 'next week'}}):
+                        {'overrides': {'earliest_available_start_date': 'next week'}},
+                        {'overrides': {'years_work_experience': 'about seven'}}):
             with self.assertRaises(ValueError): validate_saved(invalid)
         self.assertEqual(partial_date('2020'), '2020')
         self.assertEqual(partial_date('May 2020'), '2020-05')

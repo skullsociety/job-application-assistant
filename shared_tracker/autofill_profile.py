@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import threading
 from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from uuid import uuid4
 from .schema import LOCAL_DATA, WORKSPACE
@@ -22,7 +24,7 @@ TEXT_FIELDS = ('prefix','full_name','first_name','last_name','email','phone','ph
                'street_name','additional_address','address_line1','postal_code','linkedin_url','website_url','website_url_2',
                'expected_salary','salary_currency','notice_period','gender','date_of_birth','country_of_birth','ethnicity',
                'religion','nationality','additional_nationalities',
-               'citizenship','work_authorized','requires_sponsorship','holds_required_credentials','willing_to_travel',
+               'citizenship','years_work_experience','work_authorized','requires_sponsorship','holds_required_credentials','willing_to_travel',
                'earliest_available_start_date','related_to_employer','future_recruitment_consent','communications_consent',
                'current_monthly_base_salary','current_annual_bonus','current_variable_compensation','preferred_office_location',
                'professional_memberships','financial_interest','outside_employment_or_business','disciplinary_history',
@@ -30,6 +32,43 @@ TEXT_FIELDS = ('prefix','full_name','first_name','last_name','email','phone','ph
                'summary','skills','certifications')
 _lock = threading.RLock()
 _cache = {}
+_NON_FULL_TIME_ROLE = re.compile(r'\b(?:intern(?:ship)?|part[\s-]?time)\b', re.IGNORECASE)
+
+
+def _month_index(value: str, end: bool = False) -> int | None:
+    """Convert a supported partial date to an inclusive calendar-month index."""
+    match = re.fullmatch(r'(\d{4})(?:-(\d{2})(?:-\d{2})?)?', str(value or '').strip())
+    if not match:
+        return None
+    year = int(match.group(1))
+    month = int(match.group(2) or (12 if end else 1))
+    if not 1900 <= year <= 2200 or not 1 <= month <= 12:
+        return None
+    return year * 12 + month - 1
+
+
+def working_experience_years(entries: list[dict], today: date | None = None) -> str:
+    """Return full-time experience in years without double-counting overlaps."""
+    current = today or date.today()
+    current_month = current.year * 12 + current.month - 1
+    worked_months: set[int] = set()
+    for entry in entries if isinstance(entries, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        role_text = ' '.join(str(entry.get(field, '')) for field in ('job_title', 'description'))
+        if _NON_FULL_TIME_ROLE.search(role_text):
+            continue
+        start = _month_index(entry.get('start_date', ''))
+        end = current_month if entry.get('current') is True else _month_index(entry.get('end_date', ''), end=True)
+        if start is None or end is None or start > end:
+            continue
+        end = min(end, current_month)
+        if start <= end:
+            worked_months.update(range(start, end + 1))
+    if not worked_months:
+        return ''
+    years = (Decimal(len(worked_months)) / Decimal(12)).quantize(Decimal('0.1'), rounding=ROUND_HALF_UP)
+    return format(years, 'f').rstrip('0').rstrip('.')
 
 
 def allowed_extension(origin: str) -> bool:
@@ -70,6 +109,8 @@ def validate_saved(value: dict) -> dict:
         if key in {'earliest_available_start_date', 'date_of_birth'} and item:
             try: date.fromisoformat(item)
             except ValueError as exc: raise ValueError(f'{key.replace("_", " ").title()} must use YYYY-MM-DD.') from exc
+        if key == 'years_work_experience' and item and not re.fullmatch(r'\d{1,2}(?:\.\d)?', item):
+            raise ValueError('Years of working experience must be a number from 0 to 99.9.')
         if key in {'education','employment'}:
             fields = {'institution','qualification','field_of_study','start_date','end_date','country','grade'} if key == 'education' else {'employer','job_title','start_date','end_date','current','description','country','reason_for_leaving','salary'}
             if not isinstance(item, list) or len(item) > 30: raise ValueError('Use at most 30 history entries.')
@@ -106,6 +147,10 @@ def get_profile(path: Path = PROFILE_PATH, folders: list[Path] | None = None) ->
             defaults = {key: value for key, value in extracted.items() if key in RESUME_DEFAULT_FIELDS}
             source = {'name': resume.name, 'modified_ns': signature[1]}
         else: warnings = ['Add a source PDF or DOCX resume to local-data/resumes.']
+        experience_history = saved['overrides'].get('employment', defaults.get('employment', []))
+        calculated_experience = working_experience_years(experience_history)
+        if calculated_experience:
+            defaults['years_work_experience'] = calculated_experience
         effective = {**{key: '' for key in TEXT_FIELDS}, 'education': [], 'employment': [], **defaults, **saved['overrides']}
         if effective['first_name'] and effective['last_name']:
             warnings = [warning for warning in warnings if not warning.startswith('Given/family name order')]

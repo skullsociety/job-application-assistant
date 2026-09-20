@@ -23,7 +23,7 @@
     const saved = (data.custom_answers || []).find(item => norm(item.question) === key);
     if (saved) return saved.answer;
     // These are distinct facts, not variants of the applicant's contact details.
-    if (/\b(referee|reference contact|emergency contact|spouse|parent|supervisor|manager name|phone country code|dialling code|dialing code)\b/.test(key)) return null;
+    if (/\b(referee|reference contact|emergency contact|spouse|parent|supervisor|manager name|phone country code|dialling code|dialing code|phone ext|phone extension|telephone ext|telephone extension|extension number)\b/.test(key)) return null;
     const item = (profile[section] || [])[index];
     const match = matcher => typeof matcher === 'function' ? matcher(key) : matcher.test(key);
     if (section === 'education' && item) {
@@ -35,9 +35,9 @@
     if (section === 'employment' && item) {
       if (match(/\b(currently (?:work|employ)|current (?:job|employment)|still employed|i (?:currently )?work here)\b/) && !match(/\b(name|title)\b/)) return !!item.current;
       if (match(/\b(employer|company|organi[sz]ation)( name)?\b/)) return item.employer;
+      if (match(/\b(responsibilities|duties|description|achievements)\b/)) return item.description;
       if (match(/\b(job title|position|designation|role|title)\b/)) return item.job_title;
       if (match(/\b(reason for leaving|reason for separation)\b/)) return item.reason_for_leaving;
-      if (match(/\b(responsibilities|duties|description|achievements)\b/)) return item.description;
       if (match(/\bsalary\b/)) return item.salary;
     }
     if (item) {
@@ -64,8 +64,10 @@
       [/\bdate of birth\b|\bbirth date\b/, 'date_of_birth'], [/\bcountry(?: territory)? of birth\b|\bbirth country\b/, 'country_of_birth'],
       [/\bgender\b|\bsex\b/, 'gender'], [/\brace\b|\bethnicity\b|\bethnic group\b/, 'ethnicity'], [/\breligion\b/, 'religion'],
       [/\badditional nationalit(?:y|ies)\b/, 'additional_nationalities'], [/\bprimary nationality\b|\bnationality\b/, 'nationality'],
+      [/right to work.*singapore.*status/, 'citizenship'],
       [/\bcitizenship\b/, 'citizenship'],
       [/legally authori[sz]ed to work|authori[sz]ation to work|right to work/, 'work_authorized'],
+      [/how many years of (?:working|work) experience|total years of (?:working|work) experience/, 'years_work_experience'],
       [/sponsor.*(?:visa|work authori[sz]ation)|need.*sponsorship|require.*sponsorship/, 'requires_sponsorship'],
       [/\bcountry(?: of residence)?\b/, 'country'],
       [/\b(city|town)\b/, 'city'], [/\b(address line 2|additional address|address 2)\b/, 'additional_address'],
@@ -101,7 +103,15 @@
     const groups = [['singapore', 'singaporean'], ['citizen singapore', 'singapore citizen'], ['within one month', 'one month', '1 month']];
     return groups.some(group => group.includes(left) && group.includes(right));
   }
-  const api = {norm, supported, skillsLabel, multiValueLabel, answer, protectedQuestion, optionMatch, datePart};
+  function degreeMatch(label, value) {
+    const degree = norm(value), option = norm(label);
+    if (/\bbachelor\b/.test(degree)) return option === (/honours|honors/.test(degree) ? 'bachelor degree honours' : 'bachelor degree');
+    if (/^diploma\b/.test(degree)) return option === 'diploma professional diploma';
+    if (/\bmaster(?:s)?\b/.test(degree)) return option === 'masters';
+    if (/\b(phd|doctorate|doctor of)\b/.test(degree)) return option === 'doctorate';
+    return false;
+  }
+  const api = {norm, supported, skillsLabel, multiValueLabel, answer, protectedQuestion, optionMatch, degreeMatch, datePart};
   globalThis.SuccessFactorsCore = api;
   if (typeof module !== 'undefined') module.exports = api;
 })();

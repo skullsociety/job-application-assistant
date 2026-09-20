@@ -3,13 +3,16 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const core = require('./extension/successfactors-core.js');
 test('generic field mapping uses the supplied resume profile only', () => {
-  const data = {profile:{prefix:'Mr.',first_name:'Alex',phone_device_type:'Mobile',street_name:'1 Example Street',additional_address:'Unit 2',linkedin_url:'https://linkedin.com/in/example',website_url:'https://one.example',website_url_2:'https://two.example',gender:'Example gender',date_of_birth:'1990-02-03',country_of_birth:'Example birth country',ethnicity:'Example ethnicity',religion:'Example religion',nationality:'Example nationality',additional_nationalities:'Second nationality',expected_salary:'4200',notice_period:'One month',work_authorized:'Yes',requires_sponsorship:'No',willing_to_travel:'Yes',future_recruitment_consent:'No',criminal_record:'No',employment:[{employer:'Example Ltd',current:true,job_title:'Analyst',start_date:'2020-03'}]},custom_answers:[]};
+  const data = {profile:{prefix:'Mr.',first_name:'Alex',phone:'12345678',phone_device_type:'Mobile',street_name:'1 Example Street',additional_address:'Unit 2',linkedin_url:'https://linkedin.com/in/example',website_url:'https://one.example',website_url_2:'https://two.example',gender:'Example gender',date_of_birth:'1990-02-03',country_of_birth:'Example birth country',ethnicity:'Example ethnicity',religion:'Example religion',nationality:'Example nationality',additional_nationalities:'Second nationality',citizenship:'Singapore Citizen',years_work_experience:'7.3',expected_salary:'4200',notice_period:'One month',work_authorized:'Yes',requires_sponsorship:'No',willing_to_travel:'Yes',future_recruitment_consent:'No',criminal_record:'No',employment:[{employer:'Example Ltd',current:true,job_title:'Analyst',description:'Built and maintained reporting pipelines.',start_date:'2020-03'}]},custom_answers:[]};
   assert.equal(core.answer('Given Name', '', 0, data), 'Alex');
   assert.equal(core.answer('Current employer name', 'employment', 0, data), 'Example Ltd');
   assert.equal(core.answer('Start year', 'employment', 0, data), '2020');
+  assert.equal(core.answer('Role Description', 'employment', 0, data), 'Built and maintained reporting pipelines.');
+  assert.equal(core.answer('Role', 'employment', 0, data), 'Analyst');
   assert.equal(core.answer('Expected annual salary', '', 0, data), null);
   assert.equal(core.answer('Prefix', '', 0, data), 'Mr.');
   assert.equal(core.answer('Phone Device Type', '', 0, data), 'Mobile');
+  assert.equal(core.answer('Phone Number', '', 0, data), '12345678');
   assert.equal(core.answer('Street Name', '', 0, data), '1 Example Street');
   assert.equal(core.answer('Additional Address', '', 0, data), 'Unit 2');
   assert.equal(core.answer('LinkedIn Website', '', 0, data), 'https://linkedin.com/in/example');
@@ -22,6 +25,8 @@ test('generic field mapping uses the supplied resume profile only', () => {
   assert.equal(core.answer('Primary Nationality', '', 0, data), 'Example nationality');
   assert.equal(core.answer('Additional Nationalities', '', 0, data), 'Second nationality');
   assert.equal(core.answer('Are you legally authorised to work in this country?', '', 0, data), 'Yes');
+  assert.equal(core.answer('What is your right-to-work-in-Singapore status?', '', 0, data), 'Singapore Citizen');
+  assert.equal(core.answer('How many years of working experience do you have (excluding internships and part-time jobs)?', '', 0, data), '7.3');
   assert.equal(core.answer('Will you need sponsorship for your work authorisation?', '', 0, data), 'No');
   assert.equal(core.answer('How much notice must you provide your current employer before leaving?', '', 0, data), 'One month');
   assert.equal(core.answer('I agree to have my personal data processed for other positions', '', 0, data), 'No');
@@ -31,6 +36,9 @@ test('generic field mapping uses the supplied resume profile only', () => {
   assert.equal(core.answer('First name', '', 0, {profile:{}}), undefined);
   assert.equal(core.answer('Country of birth', '', 0, {profile:{country:'Example'}}), undefined);
   assert.equal(core.answer('Referee first name', '', 0, data), null);
+  assert.equal(core.answer('Phone Extension', '', 0, data), null);
+  assert.equal(core.answer('Phone Ext.', '', 0, data), null);
+  assert.equal(core.answer('Telephone Extension Number', '', 0, data), null);
 });
 test('only supported SAP hosts and exact dropdown answers match', () => {
   assert.ok(core.supported('career.successfactors.eu'));
