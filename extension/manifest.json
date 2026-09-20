@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Unified Job Application Assistant",
-  "version": "3.0.22",
+  "version": "3.0.26",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA32jAaby3RCx/DSPOBbEM7wo5VXOHvdJXZGmI1VqpX7L+f9V1GP6l7/5vSaGKOFDQDCc3csvUCnB9we2T3zjMD8BrIyfNIzYqY01RmS88fRfSgTPShAvok4RoyxCQZVJFVJBxz6ArYgrVh7oVU9L2i4Ilm/2ol1HjebTRBneV39ZPSCzoJ5gcbGK8ylKpyCWhVV1jBCsRbDLwwQkQbwWobphIOtLJLADuoAybSA5IvpG3WEBDApZ28rUSaOtzxAE4dXcGIM2BPwKCDKLhcdzTTEwFLl2PJgZ848Famc+vLkb8sXdIZ43TvVezofcTYPTuBWew+m0P6ArD5aFlZN2lwwIDAQAB",
   "description": "Capture LinkedIn, JobStreet and Careers@Gov jobs, then track and autofill applications locally.",
   "permissions": [

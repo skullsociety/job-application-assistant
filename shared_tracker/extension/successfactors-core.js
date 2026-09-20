@@ -7,6 +7,8 @@
   const protectedQuestion = label => /\b(password|verification|one time|captcha|consent|declare|declaration|certify|agree|terms and conditions|national id|nric number|passport number|criminal|medical|disability|conflict of interest)\b/.test(norm(label));
   function answer(label, section, index, data) {
     const key = norm(label), profile = data.profile || {};
+    const exactSaved = (data.custom_answers || []).find(item => norm(item.question) === key);
+    if (exactSaved && !/\b(password|verification|captcha|consent|declaration|certify|agree|terms and conditions|national id|nric number|passport number)\b/.test(key)) return exactSaved.answer;
     // Consent is filled only from an explicit saved choice. It is never inferred
     // from a resume, citizenship or another answer.
     const explicit = [
@@ -33,6 +35,7 @@
       if (match(/\b(gpa|grade|result|class of hono[u]?rs)\b/)) return item.grade;
     }
     if (section === 'employment' && item) {
+      if (match(/^(?:location|work location|job location)$/)) return item.country || profile.employment_location || null;
       if (match(/\b(currently (?:work|employ)|current (?:job|employment)|still employed|i (?:currently )?work here)\b/) && !match(/\b(name|title)\b/)) return !!item.current;
       if (match(/\b(employer|company|organi[sz]ation)( name)?\b/)) return item.employer;
       if (match(/\b(responsibilities|duties|description|achievements)\b/)) return item.description;

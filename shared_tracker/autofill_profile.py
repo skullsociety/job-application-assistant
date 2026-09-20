@@ -29,7 +29,7 @@ TEXT_FIELDS = ('prefix','full_name','first_name','last_name','email','phone','ph
                'current_monthly_base_salary','current_annual_bonus','current_variable_compensation','preferred_office_location',
                'professional_memberships','financial_interest','outside_employment_or_business','disciplinary_history',
                'criminal_record','relatives_at_employer','referral_source','declaration_acknowledgement',
-               'summary','skills','certifications')
+               'summary','skills','certifications','employment_location')
 _lock = threading.RLock()
 _cache = {}
 _NON_FULL_TIME_ROLE = re.compile(r'\b(?:intern(?:ship)?|part[\s-]?time)\b', re.IGNORECASE)

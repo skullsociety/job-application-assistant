@@ -60,6 +60,11 @@
   function context(el) {
     let root = el.parentElement;
     while (root && root !== document.body) {
+      // Date wrappers inherit workExperience/education IDs but are fields,
+      // not history entries. Counting them shifts subsequent record indexes.
+      if (root.matches('[data-automation-id="dateInputWrapper"]') || /dateSection|--(?:startDate|endDate|firstYearAttended|lastYearAttended)/.test(root.id || '')) {
+        root = root.parentElement; continue;
+      }
       const title = heading(root);
       const section = /education|academic|qualification/.test(title) ? 'education' : /employment|work experience|work history|professional experience/.test(title) ? 'employment' : '';
       if (section && root.querySelectorAll('input,textarea,select,[role="combobox"]').length >= 2) return {section, root};
@@ -72,6 +77,9 @@
     const names = section === 'employment' ? /\b(?:work experience|work history|employment)\s+(\d+)\b/ : /\b(?:education|qualification)\s+(\d+)\b/;
     let root = el.parentElement;
     while (root && root !== document.body) {
+      if (root.matches('[data-automation-id="dateInputWrapper"]') || /dateSection|--(?:startDate|endDate|firstYearAttended|lastYearAttended)/.test(root.id || '')) {
+        root = root.parentElement; continue;
+      }
       const match = heading(root).match(names);
       if (match) return Number(match[1]) - 1;
       root = root.parentElement;
@@ -279,6 +287,16 @@
     }
     value = dateValue(el, String(value));
     if (!value) return false;
+    if (/^dateSection(?:Month|Year|Day)-input$/.test(el.getAttribute('data-automation-id') || '')) {
+      el.focus();
+      nativeSet(el, value, false);
+      // The controlled date segment commits state asynchronously. Blurring
+      // immediately can validate the previous (empty) month/year instead.
+      await pause(120);
+      if (el.isConnected) el.blur();
+      await pause(50);
+      return el.value === value;
+    }
     nativeSet(el, value);
     await pause(50);
     return el.value === value;
@@ -332,6 +350,33 @@
     }
     return added;
   }
+  async function fillWebsites() {
+    if (!/\.myworkdayjobs\.com$/i.test(location.hostname)) return 0;
+    const links = [...new Set(['linkedin_url','website_url','website_url_2']
+      .map(key => String(profile.profile[key] || '').trim()).filter(url => /^https?:\/\//i.test(url)))];
+    if (!links.length) return 0;
+    const section = [...document.querySelectorAll('section,[role="group"]')]
+      .find(el => /^websites?$/.test(heading(el)));
+    if (!section) return 0;
+    const urlFields = () => [...section.querySelectorAll('input')].filter(el => visible(el) && !el.disabled && !el.readOnly
+      && /^(url|website|website url)$/.test(core.norm(identity(el))));
+    let filled = 0;
+    for (const link of links) {
+      const normalize = url => String(url).trim().replace(/\/$/, '');
+      if (urlFields().some(el => normalize(el.value) === normalize(link))) continue;
+      let field = urlFields().find(empty);
+      if (!field) {
+        const button = [...section.querySelectorAll('button')].find(el => visible(el) && !el.disabled
+          && /^(add|add another|add website|add another website)$/.test(core.norm(text(el))));
+        if (!button) break;
+        button.click();
+        for (let attempt=0;attempt<20 && !field;attempt++) {await pause(100);field=urlFields().find(empty);}
+      }
+      if (!field) break;
+      if (await fill(field, link, 'URL')) filled++;
+    }
+    return filled;
+  }
   async function scan({force = false} = {}) {
     if (running || (!force && autoCompleted) || document.hidden || !owner(force) || accountScreen()) return;
     running = true;
@@ -351,16 +396,18 @@
       }
       if (!profile.enabled) { notice('Application autofill is off.'); return; }
       await expandHistory();
+      const websiteCount = await fillWebsites();
       const fields = controls(), roots = {education: [], employment: []};
       for (const el of fields) if (core.skillsLabel(identity(el))) {
         for (const name of [...failedSkills]) if (selectedTags(el).some(tag => sameSkill(tag, name))) failedSkills.delete(name);
       }
       for (const el of fields) { const ctx = context(el); if (ctx.section && !roots[ctx.section].includes(ctx.root)) roots[ctx.section].push(ctx.root); }
       const occurrence = new Map();
-      let filled = 0, unresolved = 0, mapped = 0;
+      let filled = websiteCount, unresolved = 0, mapped = websiteCount;
       for (const el of fields) {
         const label = identity(el), ctx = context(el);
-        if (!label || core.protectedQuestion(label)) continue;
+        const savedQuestion = (profile.custom_answers || []).some(item => core.norm(item.question) === core.norm(label));
+        if (!label || (core.protectedQuestion(label) && !savedQuestion)) continue;
         let index = ctx.section ? roots[ctx.section].indexOf(ctx.root) : 0;
         const numberedIndex = numberedHistoryIndex(el, ctx.section);
         if (numberedIndex !== null) index = numberedIndex;

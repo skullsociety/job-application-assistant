@@ -332,6 +332,55 @@ test('Workday leaves an unmatched degree choice alone for manual selection', asy
     assert.equal(await page.locator('#degree').getAttribute('aria-expanded'), 'false');
   } finally {await browser.close();}
 });
+test('Workday adds resume websites once and preserves existing URLs and deletions', async () => {
+  const testProfile={...profile,profile:{...profile.profile,linkedin_url:'https://linkedin.com/in/example',website_url:'https://example.github.io',website_url_2:'https://example.github.io/'}};
+  const {browser,page}=await browserPage(`<form><section role="group" aria-label="Websites"><h2>Websites</h2><button type="button" id="add">Add</button></section><section><h2>Certifications</h2><button type="button" id="other">Add</button></section></form>`, 'https://tenant.myworkdayjobs.com/application',testProfile);
+  try {
+    await page.evaluate(()=>{
+      window.otherClicks=0;other.onclick=()=>window.otherClicks++;
+      add.onclick=()=>{const label=document.createElement('label');label.textContent='URL';label.append(document.createElement('input'));add.before(label);add.textContent='Add Another';};
+    });
+    await page.addScriptTag({path:asset('successfactors-core.js')});
+    await page.addScriptTag({path:asset('successfactors-autofill.js')});
+    await page.waitForFunction(()=>document.querySelector('[data-summary]')?.textContent.includes('Automatic filling is now paused'),null,{timeout:5000});
+    assert.deepEqual(await page.locator('input').evaluateAll(es=>es.map(e=>e.value)),['https://linkedin.com/in/example','https://example.github.io']);
+    await page.locator('input').first().fill('https://manual.example');
+    await page.evaluate(()=>document.querySelectorAll('label')[1].remove());
+    await page.evaluate(()=>SuccessFactorsAutofill.scan());
+    assert.deepEqual(await page.locator('input').evaluateAll(es=>es.map(e=>e.value)),['https://manual.example']);
+    assert.equal(await page.evaluate(()=>window.otherClicks),0);
+  } finally {await browser.close();}
+});
+test('Workday date wrappers do not shift employment indexes and commit before blur', async () => {
+  const testProfile={...profile,profile:{...profile.profile,employment:[
+    {job_title:'First',start_date:'2024-11',end_date:'2026-09'},
+    {job_title:'Second',start_date:'2023-03',end_date:'2024-11'},
+    {job_title:'Third',start_date:'2022-07',end_date:'2022-09'},
+    {job_title:'Fourth',start_date:'2021-10',end_date:'2022-04'},
+    {job_title:'Fifth',start_date:'2020-09',end_date:'2021-09'},
+    {job_title:'Sixth',start_date:'2016-07',end_date:'2018-03'}]}};
+  const dates=(id,name)=>`<div role="group" id="workExperience-${id}--${name}" data-automation-id="dateInputWrapper">
+    <input id="workExperience-${id}--${name}-dateSectionMonth-input" data-automation-id="dateSectionMonth-input" aria-label="Month">
+    <input id="workExperience-${id}--${name}-dateSectionYear-input" data-automation-id="dateSectionYear-input" aria-label="Year"></div>`;
+  const {browser,page}=await browserPage(`<form><section><h2>Work Experience</h2>
+    <label>Job Title<input></label>${dates(8,'startDate')}${dates(8,'endDate')}
+    <label>Job Title<input></label>${dates(32,'startDate')}${dates(32,'endDate')}
+    ${[45,62,83,108].map(id=>`<label>Job Title<input></label>${dates(id,'startDate')}${dates(id,'endDate')}`).join('')}</section></form>`,
+    'https://tenant.myworkdayjobs.com/application',testProfile);
+  try {
+    await page.evaluate(()=>{
+      for(const el of document.querySelectorAll('[data-automation-id$="-input"]')){
+        let accepted='';
+        el.addEventListener('input',()=>{const next=el.value;setTimeout(()=>accepted=next,40);});
+        el.addEventListener('focusout',()=>{el.value=accepted;el.dataset.committed=accepted;});
+      }
+    });
+    await page.addScriptTag({path:asset('successfactors-core.js')});
+    await page.addScriptTag({path:asset('successfactors-autofill.js')});
+    await page.waitForFunction(()=>document.querySelector('[id="workExperience-108--endDate-dateSectionYear-input"]').dataset.committed==='2018',null,{timeout:10000});
+    assert.deepEqual(await page.locator('[data-automation-id$="-input"]').evaluateAll(es=>es.map(e=>e.value)),['11','2024','09','2026','03','2023','11','2024','07','2022','09','2022','10','2021','04','2022','09','2020','09','2021','07','2016','03','2018']);
+  } finally {await browser.close();}
+});
 test('Workday fills separate month and year controls under shared history date labels', async () => {
   const testProfile = {...profile,profile:{...profile.profile,
     education:[{start_date:'2018-04',end_date:'2020-04'}],
