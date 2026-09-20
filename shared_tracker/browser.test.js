@@ -20,6 +20,47 @@ async function browserPage(html, url = 'https://career.successfactors.com/applic
   });
   return {browser,page};
 }
+test('Workday questionnaire buttons resolve nearby saved questions and preserve manual choices', async () => {
+  const answers = [
+    {question:'Have you ever been convicted of a criminal offence?',answer:'No'},
+    {question:'Have you ever been subjected to any bankruptcy proceedings or been adjudicated a bankrupt?',answer:'No'},
+    {question:'Do you have any business interest and/or external activity?',answer:'No'},
+    {question:'ID Type (For foreign applicants, please select Passport)',answer:'Singapore Pink NRIC'},
+    {question:'Do you require employer sponsorship for a work pass or visa to work in this role?',answer:'No'},
+  ];
+  const html = answers.map((a,i) => `<div class="field"><label>${a.question}*</label><div><div>
+    <button type="button" id="q${i}" aria-haspopup="listbox" aria-label=" Select One Required">Select One</button>
+    <input type="text" style="display:none"></div></div></div>`).join('') +
+    '<div class="field"><label>Unrecognised question*</label><button id="unknown" type="button" aria-haspopup="listbox" aria-label="Select One Required">Select One</button></div>';
+  const {browser,page} = await browserPage(html,'https://uobgroup.wd3.myworkdayjobs.com/application', {...profile,custom_answers:answers});
+  try {
+    await page.evaluate(() => {
+      document.querySelectorAll('button').forEach(button => button.onclick = () => {
+        const list = document.createElement('ul'); list.setAttribute('role','listbox');
+        button.setAttribute('aria-expanded','true');
+        for (const value of ['Yes','No','Singapore Pink NRIC']) {
+          const option = document.createElement('li'); option.setAttribute('role','option'); option.textContent=value;
+          option.onclick = () => {button.textContent=value;button.value=value;button.setAttribute('aria-expanded','false');list.remove();};
+          list.append(option);
+        }
+        button.parentElement.append(list);
+      });
+    });
+    await page.addScriptTag({path:asset('successfactors-core.js')});
+    await page.addScriptTag({path:asset('successfactors-autofill.js')});
+    await page.waitForFunction(() => document.querySelector('#job-assistant-sf-status')?.textContent.includes('Automatic filling is now paused'));
+    for (const [i,a] of answers.entries()) {
+      assert.equal(await page.locator(`#q${i}`).innerText(), a.answer);
+      assert.equal(await page.locator(`#q${i}`).evaluate(el => SuccessFactorsAutofill.identity(el)), a.question);
+    }
+    assert.equal(await page.locator('#unknown').innerText(),'Select One');
+    await page.locator('#q0').click();
+    await page.getByRole('option',{name:'Yes',exact:true}).click();
+    await page.evaluate(() => SuccessFactorsAutofill.scan());
+    assert.equal(await page.locator('#q0').innerText(),'Yes');
+  } finally { await browser.close(); }
+});
+
 test('fills text, real options, repeated history; skips unknown dates and existing answers', async () => {
   const {browser,page} = await browserPage(`<form><h1>Application</h1><label>First name<input id="first"></label><label>Email<input id="email" value="keep@example.org"></label><label>Country<select id="country"><option value="">Select One</option><option>Singapore</option></select></label>
   <fieldset><legend>Education</legend><label>Institution<input id="school"></label><label>Completion date<input type="date" id="date"></label></fieldset>

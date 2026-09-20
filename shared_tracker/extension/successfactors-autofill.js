@@ -44,7 +44,9 @@
     if (!labels && !labelled) {
       let root = el.parentElement;
       while (root && root !== document.body) {
-        const inputs = [...root.querySelectorAll('input,textarea,select,[role="combobox"]')].filter(visible);
+        // Workday questionnaires use buttons with a generic "Select One"
+        // accessible name. Count them so their nearby question label is found.
+        const inputs = [...root.querySelectorAll('input,textarea,select,[role="combobox"],button[aria-haspopup="listbox"]')].filter(visible);
         if (inputs.length > 1) break;
         const fieldLabels = root.querySelectorAll('label,[data-automation-id="formLabel"]');
         if (inputs.length === 1 && fieldLabels.length === 1) { nearby = text(fieldLabels[0]); break; }
