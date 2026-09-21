@@ -32,7 +32,6 @@ from job_assistant.models import Job
 from job_assistant.profile import load_profile
 from job_assistant.resume_matcher import extract_skills, match_resume_to_job
 from job_assistant.resume_reader import latest_resume, read_resume
-from job_assistant.tailored_resume import create_tailored_resume
 from job_assistant.urls import canonicalize_job_url, is_linkedin_hostname
 from shared_tracker.cover_letters import save_cover_letter
 
@@ -210,13 +209,8 @@ class BackgroundProcessor:
         )
         if saved is None:
             return  # A newer capture has already queued its own analysis.
-        if result.score >= self.store.settings.tailored_resume_threshold:
-            output = create_tailored_resume(resume_text, saved, result, self.store.settings.tailored_resume_dir)
-            self.store.set_tailored_resume(job_id, output.name, expected_hash=job.description_hash)
-            print(f"LinkedIn job #{job_id}: {result.score}% match; tailored resume created: {output.name}")
-        else:
-            self.store.set_tailored_resume(job_id, None, expected_hash=job.description_hash)
-            print(f"LinkedIn job #{job_id}: {result.score}% match; review recommendation: {result.recommendation}.")
+        # Analysis updates scores only; existing resume files and links are user-owned.
+        print(f"LinkedIn job #{job_id}: {result.score}% match; review recommendation: {result.recommendation}.")
         self.store.export()
 
 
@@ -644,11 +638,8 @@ def run() -> None:
     print("LinkedIn Chrome companion is running locally.")
     print(f"Dashboard: http://{HOST}:{PORT}/")
     try:
-        # The dashboard is already available while this one-time startup refresh
-        # exports existing rows and queues resume matching.
+        # Opening Chrome must not reprocess saved jobs or regenerate documents.
         store.export()
-        queued = processor.enqueue_all()
-        print(f"Queued {queued} saved job(s) for resume refresh. Leave this window open while using the extension.")
         while server_thread.is_alive():
             server_thread.join(timeout=0.5)
     except KeyboardInterrupt:

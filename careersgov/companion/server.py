@@ -18,7 +18,7 @@ from urllib.parse import unquote, urlsplit, urlunsplit
 
 from .excel_export import TRACKER_PATH, export_jobs
 from .matching import extract_skills, match_resume
-from .resume_tools import create_tailored_resume, latest_resume, read_resume
+from .resume_tools import latest_resume, read_resume
 from .tracker import CAPTURE_FIELDS, SHARED_COLUMNS, description_hash, optional_http_url, public_job, validate_tracking
 from shared_tracker.schema import DATABASE_PATH, EXTRA_COLUMNS, LOCAL_DATA, normalize_shared_rows
 from shared_tracker.cover_letters import generate_cover_letter, save_cover_letter
@@ -241,7 +241,7 @@ class JobStore:
             "match_reason": "No source resume is available for comparison.",
             "recommendation": "review manually",
             "resume_name": None,
-            "tailored_resume_path": None,
+            "tailored_resume_path": job.get("tailored_resume_path"),
         }
         try:
             resume_path, resume_text = self._latest_resume_text()
@@ -254,19 +254,7 @@ class JobStore:
                 recommendation=match.recommendation,
                 resume_name=resume_path.name,
             )
-            company = str(job["company"])
-            if _should_create_tailored_resume(match.score, company, self.high_compatibility_threshold):
-                output = create_tailored_resume(
-                    resume_text,
-                    int(job["id"]),
-                    company,
-                    str(job["title"]),
-                    match,
-                    self.tailored_resume_dir,
-                )
-                analysis["tailored_resume_path"] = output.name
-                if _is_govtech_agency(company) and match.score is not None and match.score < self.high_compatibility_threshold:
-                    analysis["recommendation"] = "GovTech tailored resume created because compatibility is above 50%"
+            # Matching never creates or replaces the user's resume documents.
         except Exception as exc:
             analysis["match_reason"] = f"Resume processing unavailable: {exc}"
 
@@ -684,9 +672,7 @@ def run() -> None:
     CompanionHandler.store = store
     CompanionHandler.processor = processor
     server = ThreadingHTTPServer((HOST, PORT), CompanionHandler)
-    # Bind before slow PDF / Excel work so the extension can connect immediately.
-    for job in store.list_jobs():
-        processor.enqueue(int(job["id"]))
+    # Startup only exports the tracker; saved jobs are not reprocessed.
     processor.request_export()
     print("Careers@Gov companion is running locally.")
     print(f"Dashboard: http://{HOST}:{PORT}/")
