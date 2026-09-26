@@ -51,3 +51,77 @@ def normalize_shared_rows(connection: sqlite3.Connection) -> None:
             if not original_skills.startswith('None recognized'):
                 skills = original_skills
         connection.execute('UPDATE jobs SET source_job_id=?, key_skills=? WHERE id=?', (source_id, skills, identifier))
+
+
+def install_aws_sync_outbox(connection: sqlite3.Connection) -> None:
+    """Install transactional change capture for the minimal dashboard snapshot.
+
+    Existing rows are deliberately not backfilled: only changes made after this
+    migration are queued. The record key uses the local SQLite row ID; the JSON
+    snapshot excludes URLs, descriptions, notes, and resume data.
+    """
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS aws_sync_outbox (
+            sequence INTEGER NOT NULL UNIQUE,
+            event_id TEXT NOT NULL UNIQUE,
+            record_key TEXT NOT NULL,
+            operation TEXT NOT NULL CHECK(operation IN ('upsert', 'delete')),
+            payload_json TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT,
+            sent_at TEXT
+        )
+    """)
+    existing = {row[1] for row in connection.execute("PRAGMA table_info(aws_sync_outbox)")}
+    if "sequence" not in existing:
+        connection.execute("ALTER TABLE aws_sync_outbox ADD COLUMN sequence INTEGER")
+        connection.execute("UPDATE aws_sync_outbox SET sequence = rowid WHERE sequence IS NULL")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_aws_sync_outbox_pending_sequence ON aws_sync_outbox(sent_at, sequence)")
+    connection.executescript("""
+        CREATE TRIGGER IF NOT EXISTS jobs_aws_sync_insert AFTER INSERT ON jobs
+        BEGIN
+            INSERT INTO aws_sync_outbox(sequence, event_id, record_key, operation, payload_json)
+            VALUES (
+                (SELECT COALESCE(MAX(sequence), 0) + 1 FROM aws_sync_outbox),
+                lower(hex(randomblob(16))),
+                'local:' || NEW.id,
+                'upsert',
+                json_object('source', NEW.source, 'date_found', NEW.date_found,
+                    'status', NEW.status, 'applied', NEW.applied,
+                    'applied_at', NEW.applied_at, 'follow_up_date', NEW.follow_up_date,
+                    'followed_up', NEW.followed_up)
+            );
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS jobs_aws_sync_update AFTER UPDATE ON jobs
+        WHEN OLD.source IS NOT NEW.source OR OLD.date_found IS NOT NEW.date_found
+          OR OLD.status IS NOT NEW.status OR OLD.applied IS NOT NEW.applied
+          OR OLD.applied_at IS NOT NEW.applied_at
+          OR OLD.follow_up_date IS NOT NEW.follow_up_date
+          OR OLD.followed_up IS NOT NEW.followed_up
+        BEGIN
+            INSERT INTO aws_sync_outbox(sequence, event_id, record_key, operation, payload_json)
+            VALUES (
+                (SELECT COALESCE(MAX(sequence), 0) + 1 FROM aws_sync_outbox),
+                lower(hex(randomblob(16))),
+                'local:' || NEW.id,
+                'upsert',
+                json_object('source', NEW.source, 'date_found', NEW.date_found,
+                    'status', NEW.status, 'applied', NEW.applied,
+                    'applied_at', NEW.applied_at, 'follow_up_date', NEW.follow_up_date,
+                    'followed_up', NEW.followed_up)
+            );
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS jobs_aws_sync_delete AFTER DELETE ON jobs
+        BEGIN
+            INSERT INTO aws_sync_outbox(sequence, event_id, record_key, operation, payload_json)
+            VALUES (
+                (SELECT COALESCE(MAX(sequence), 0) + 1 FROM aws_sync_outbox),
+                lower(hex(randomblob(16))),
+                'local:' || OLD.id,
+                'delete', '{}'
+            );
+        END;
+    """)

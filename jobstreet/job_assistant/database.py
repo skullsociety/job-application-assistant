@@ -8,7 +8,7 @@ from typing import Self
 
 from .models import Job
 from .urls import canonicalize_job_url
-from shared_tracker.schema import add_shared_columns, normalize_shared_rows
+from shared_tracker.schema import add_shared_columns, install_aws_sync_outbox, normalize_shared_rows
 
 
 VALID_STATUSES = frozenset({"saved", "reviewing", "ready_for_manual_submit", "submitted_manually", "rejected", "archived"})
@@ -163,6 +163,7 @@ class JobRepository:
         add_shared_columns(self.connection)
         normalize_shared_rows(self.connection)
         self._canonicalize_existing_urls()
+        install_aws_sync_outbox(self.connection)
         self.connection.commit()
 
     def _canonicalize_existing_urls(self) -> None:

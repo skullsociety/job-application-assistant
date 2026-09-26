@@ -55,12 +55,36 @@ function stopChild(child) {
   });
 }
 
-function runSupervisor({services = SERVICES, pipe = PIPE, spawnService, checkHealth = health, stopService = stopChild, idleMs = 5000} = {}) {
+function syncOnShutdown() {
+  const script = path.join(ROOT, "sync_to_aws.py");
+  const database = path.join(ROOT, "local-data", "jobs.sqlite3");
+  if (!fs.existsSync(path.join(ROOT, ".env")) || !fs.existsSync(script) || !fs.existsSync(database)) return Promise.resolve();
+  const logPath = path.join(ROOT, "local-data", "logs", "aws-sync.log");
+  const log = fs.openSync(logPath, "a");
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawn(pythonFor("jobstreet"), [script, "--drain"], {
+        cwd: ROOT, windowsHide: true, stdio: ["ignore", log, log],
+      });
+    } catch (error) {
+      fs.closeSync(log);
+      reject(error);
+      return;
+    }
+    fs.closeSync(log);
+    child.once("error", reject);
+    child.once("exit", code => code === 0 ? resolve() : reject(new Error(`AWS sync exited with code ${code}.`)));
+  });
+}
+
+function runSupervisor({services = SERVICES, pipe = PIPE, spawnService, checkHealth = health, stopService = stopChild, syncPending = syncOnShutdown, idleMs = 3000} = {}) {
   const clients = new Set();
   const children = new Map();
   let startup = null;
   let idleTimer;
   let stopping = false;
+  let shutdownPromise;
   const localData = path.join(ROOT, "local-data");
   const logDir = path.join(localData, "logs");
   fs.mkdirSync(logDir, {recursive: true});
@@ -112,18 +136,23 @@ function runSupervisor({services = SERVICES, pipe = PIPE, spawnService, checkHea
     })().finally(() => { startup = null; });
     return startup;
   }
-  async function shutdown() {
-    if (stopping) return;
+  function shutdown() {
+    if (shutdownPromise) return shutdownPromise;
     stopping = true;
     clearTimeout(idleTimer);
     server.close();
     for (const socket of clients) socket.destroy();
-    if (startup) await startup.catch(() => {});
-    await Promise.all([...children.values()].map(stopService));
+    shutdownPromise = (async () => {
+      if (startup) await startup.catch(() => {});
+      await Promise.all([...children.values()].map(stopService));
+      try { await syncPending(); }
+      catch (error) { fs.appendFileSync(path.join(logDir, "aws-sync.log"), `${new Date().toISOString()} ${error.message}\n`); }
+    })();
+    return shutdownPromise;
   }
   function scheduleIdle() {
     clearTimeout(idleTimer);
-    if (!clients.size) idleTimer = setTimeout(shutdown, idleMs);
+    if (!stopping && !clients.size) idleTimer = setTimeout(shutdown, idleMs);
   }
   const server = net.createServer(socket => {
     if (stopping) { socket.destroy(); return; }

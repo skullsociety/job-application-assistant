@@ -20,8 +20,8 @@ async function start(socket) {
   return JSON.parse((await reply)[0].toString());
 }
 
-test("one owner starts once for several extensions; last disconnect stops its children", async () => {
-  const pipe = testPipe(), running = new Set(), started = [], stopped = [];
+test("one owner starts once for several extensions; last disconnect stops children then syncs once", async () => {
+  const pipe = testPipe(), running = new Set(), started = [], stopped = [], synced = [];
   const supervisor = runSupervisor({pipe, idleMs: 40, services: [{folder: "one"}, {folder: "two"}],
     checkHealth: async service => running.has(service.folder),
     spawnService: service => {
@@ -29,6 +29,7 @@ test("one owner starts once for several extensions; last disconnect stops its ch
       return Object.assign(new EventEmitter(), {pid: started.length, exitCode: null, folder: service.folder});
     },
     stopService: async child => { stopped.push(child.folder); child.emit("exit", 0); },
+    syncPending: async () => { assert.deepEqual(stopped.sort(), ["one", "two"]); synced.push("done"); },
   });
   await once(supervisor.server, "listening");
   const one = await client(pipe), two = await client(pipe);
@@ -36,15 +37,17 @@ test("one owner starts once for several extensions; last disconnect stops its ch
     const results = await Promise.all([start(one), start(two)]);
     assert.ok(results.every(result => result.ok));
     assert.deepEqual(started, ["one", "two"]);
-    one.destroy(); await delay(80); assert.deepEqual(stopped, []);
-    two.destroy(); await delay(100); assert.deepEqual(stopped.sort(), ["one", "two"]);
+    one.destroy(); await delay(80); assert.deepEqual(stopped, []); assert.deepEqual(synced, []);
+    two.destroy(); await delay(100); assert.deepEqual(stopped.sort(), ["one", "two"]); assert.deepEqual(synced, ["done"]);
   } finally { one.destroy(); two.destroy(); await supervisor.shutdown(); }
+  assert.deepEqual(synced, ["done"]);
 });
 
 test("a pre-existing server is reported but never killed", async () => {
   const pipe = testPipe(), stopped = [];
   const supervisor = runSupervisor({pipe, idleMs: 30, services: [{folder: "external"}],
-    checkHealth: async () => true, spawnService: () => { throw Error("must not spawn"); }, stopService: child => stopped.push(child)});
+    checkHealth: async () => true, spawnService: () => { throw Error("must not spawn"); },
+    stopService: child => stopped.push(child), syncPending: async () => {}});
   await once(supervisor.server, "listening");
   const socket = await client(pipe);
   try {

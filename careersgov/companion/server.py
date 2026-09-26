@@ -20,7 +20,7 @@ from .excel_export import TRACKER_PATH, export_jobs
 from .matching import extract_skills, match_resume
 from .resume_tools import latest_resume, read_resume
 from .tracker import CAPTURE_FIELDS, SHARED_COLUMNS, description_hash, optional_http_url, public_job, validate_tracking
-from shared_tracker.schema import DATABASE_PATH, EXTRA_COLUMNS, LOCAL_DATA, normalize_shared_rows
+from shared_tracker.schema import DATABASE_PATH, EXTRA_COLUMNS, LOCAL_DATA, install_aws_sync_outbox, normalize_shared_rows
 from shared_tracker.cover_letters import generate_cover_letter, save_cover_letter
 
 HOST = "127.0.0.1"
@@ -132,6 +132,7 @@ class JobStore:
             for row in connection.execute("SELECT id, job_description FROM jobs WHERE description_hash IS NULL").fetchall():
                 connection.execute("UPDATE jobs SET description_hash = ? WHERE id = ?",
                                    (description_hash(row["job_description"] or ""), row["id"]))
+            install_aws_sync_outbox(connection)
             connection.commit()
 
     def upsert(self, payload: dict[str, Any], analyze: bool = True) -> dict[str, Any]:

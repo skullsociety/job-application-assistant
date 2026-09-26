@@ -53,6 +53,10 @@ If the editor says it cannot load saved answers after an update, fully exit Chro
 
 The autofill preserves existing answers and never submits an application. Passwords, verification, declarations, file uploads, Save/Continue and final submission stay manual. Review every generated answer before using it.
 
+### Optional AWS dashboard sync
+
+Copy `.env.example` to `.env` and set the API Gateway `/ingest` URL and the same private token configured in the ingestion Lambda. The `.env` file is excluded from Git. After the last Chrome window closes, the helper stops its companion services and sends all queued dashboard events to AWS in batches of up to 100. The helper records output and errors in `local-data/logs/aws-sync.log`. Failed events remain queued in SQLite and are retried on the next Chrome shutdown. To send a batch manually, run `.\.venv\Scripts\python.exe .\sync_to_aws.py` from this folder; add `--drain` to send all pending batches.
+
 After capturing a job, open its **Cover letter** section in the extension and click **Generate and save .txt draft**. The draft uses the captured job description and only skills recognized in both that description and your newest resume. It is saved under `local-data/exports/cover_letters/` with the job ID at the start of the filename. Review the draft, then click **Copy cover letter** to paste it into an application. Generating again updates that job's draft file.
 
 ## GitHub and privacy
